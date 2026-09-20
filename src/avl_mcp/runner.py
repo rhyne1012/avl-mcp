@@ -138,26 +138,14 @@ class AVLRunner:
         return metadata
 
     def health(self) -> dict:
-        job = self._new_job("health")
-        try:
-            metadata = self._process(job, "PLOP\nG\n\nQUIT\n", 10)
-            result = {
-                "success": True,
-                "package_version": __version__,
-                "solver": metadata,
-                "work_root": str(self.work_root),
-                "run_directory": str(job),
-                "scope": "startup, version and headless exit; not a numerical solver test",
-            }
-        except AVLFailure as exc:
-            result = exc.result() | {"run_directory": str(job)}
-        except OSError as exc:
-            result = AVLFailure("EXECUTION_OR_IO_ERROR", str(exc)).result() | {
-                "run_directory": str(job)
-            }
-        result["job_id"] = job.name
-        dump(job / "result.json", result)
-        return result
+        from .diagnostics import diagnose
+
+        return diagnose(
+            str(self.executable),
+            str(self.work_root),
+            str(self.input_root) if self.input_root else None,
+            self.max_vortices,
+        )
 
     def inspect(self, model_path: str) -> dict:
         obj = inspect_geometry(model_path, self.input_root)

@@ -79,7 +79,29 @@ async def verify(args):
                     records.append({"tool": name, "arguments": arguments, "response": record})
                     assert result.isError is not expected, record
                     assert result.structuredContent["success"] is expected, record
+                    if name == "avl.health":
+                        diagnostic = result.structuredContent
+                        assert diagnostic["verification"]["native_startup"]["status"] == "passed"
+                        assert diagnostic["verification"]["numerical_case"]["status"] == "not_run"
+                        assert (
+                            diagnostic["verification"]["mcp_connection"]["status"]
+                            == "request_received"
+                        )
+                        assert (
+                            diagnostic["verification"]["desktop_registration"]["status"]
+                            == "not_tested"
+                        )
+                    if name == "avl.sweep" and expected:
+                        for row in result.structuredContent["results"]:
+                            assert row["result_context"]["units"]["length"] == "in"
                     if name == "avl.run" and expected:
+                        contract = result.structuredContent["result_contract"]
+                        assert contract["schema_version"] == "1.0.0"
+                        assert contract["references"]["Sref"] == 9
+                        assert (
+                            contract["derivative_tables"]["stability"]["fields"]["CLa"]["unit"]
+                            == "rad^-1"
+                        )
                         total = result.structuredContent["total"]["fields"]
                         assert abs(total["CLtot"] - 0.6754170403902354) < 1e-8
                 submitted = await session.call_tool(
@@ -139,6 +161,10 @@ async def verify(args):
                     {"job_id": job_id, "indices": [0, 3], "fields": ["total.fields.CLtot"]},
                 )
                 assert not query.isError and len(query.structuredContent["rows"]) == 2
+                assert all(
+                    row["result_context"]["schema_version"] == "1.0.0"
+                    for row in query.structuredContent["rows"]
+                )
                 assert (
                     abs(
                         query.structuredContent["rows"][1]["fields"]["total.fields.CLtot"]

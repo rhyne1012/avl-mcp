@@ -4,7 +4,7 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Status: 0.2.0.dev0, development snapshot (no new Release).** Supports AVL **3.52** only. Native execution is
+**Status: 0.2.0.dev1, development snapshot (no new Release).** Supports AVL **3.52** only. Native execution is
 tested on macOS Apple Silicon; other operating systems are not yet verified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
@@ -14,7 +14,7 @@ This project is an independent wrapper, not an official MIT or AVL release.
 
 | Tool | Purpose |
 |---|---|
-| `avl.health` | Check solver version, startup and headless exit; save logs |
+| `avl.health` | Diagnose Python/native installation, directory access and headless startup |
 | `avl.inspect` | Read geometry, references, controls and file dependencies |
 | `avl.validate` | Check supported grammar, dependency paths and mesh budget |
 | `avl.run` | Calculate one prescribed condition, loads and ST/SB derivatives |
@@ -104,6 +104,11 @@ Equivalent environment variables are `AVL_BIN`, `AVL_MCP_WORK_ROOT`, and
 
 Installing a wheel and testing a standalone MCP process do not register tools in
 an already running desktop session. Client registration/reload is a separate step.
+
+For connection troubleshooting, run `avl-mcp --diagnose` or `avl-mcp --check-mcp`
+with the same AVL/work-root arguments. They print structured evidence without
+changing client settings. [Diagnostic layers and workflow](docs/diagnostics.md)
+distinguish native startup, numerical tests, fresh stdio and desktop registration.
 
 ## Example requests
 
@@ -211,6 +216,20 @@ labels the data (`m`, `ft`, `in`, or `unspecified`); it does **not** convert geo
 For the official Bubble Dancer example, the supplied mass file documents inches.
 
 ## Results and conventions
+
+Every successful case adds a versioned `result_contract`, also saved as
+`result-contract.json`: actual reference dimensions/point, units, axes, coefficient
+normalizations, ST/SB derivative variables and section control gains. Compact
+`result_context` accompanies sweep summaries and selected saved-result queries.
+Unknown units stay `Lunit`; native coefficients are unchanged. Separately calculated
+`derived.wind_forces` records the rotation of native stability totals.
+
+See the [complete result contract](docs/result-contract.md), including two upstream
+3.52 caveats exposed by tests: constant CDp with sideslip can make native stability
+and body force projections differ, and ST alpha derivatives at nonzero p/r can
+differ from fixed-stability-rate perturbations. Applicable cases carry explicit
+limitation codes and warnings; no native number is silently corrected.
+
 
 Synchronous executions use `<work-root>/runs/`; background jobs use `<work-root>/jobs/`.
 Each job retains native process folders and separate per-case outputs:

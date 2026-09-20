@@ -9,6 +9,7 @@ import subprocess
 import time
 import uuid
 
+from .contract import attach_contract
 from .geometry import sha256
 from .models import AVLFailure, output_selection
 from .outputs import parse_derivatives, parse_strips, parse_surfaces, parse_total
@@ -158,6 +159,7 @@ def collect_case(folder, obj, condition, references, outputs, length_unit):
     if "strips" in outputs:
         names += ["strips.json", "strips.csv"]
     result["artifacts"] = {name: str(folder / name) for name in names}
+    attach_contract(result, folder, obj)
     return result
 
 

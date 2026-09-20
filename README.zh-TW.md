@@ -3,7 +3,7 @@
 透過 MCP 執行 AVL 3.52 氣動分析。原有工具：
 `avl.health`、`avl.inspect`、`avl.validate`、`avl.run`、`avl.sweep`。
 
-開發版本為 `0.2.0.dev1`（本次不建立新的 GitHub Release），本機測試平台為 macOS Apple Silicon。
+套件版本為 `0.2.0`（本次不建立新的 GitHub Release），本機測試平台為 macOS Apple Silicon。
 安裝與完整工具說明見 [英文 README](README.md)，驗證範圍見
 [驗證紀錄](docs/validation.md)。
 

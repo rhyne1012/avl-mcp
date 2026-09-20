@@ -4,7 +4,7 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Status: 0.2.0.dev1, development snapshot (no new Release).** Supports AVL **3.52** only. Native execution is
+**Version: 0.2.0 (no GitHub Release is created for this version).** Supports AVL **3.52** only. Native execution is
 tested on macOS Apple Silicon; other operating systems are not yet verified.
 This project is an independent wrapper, not an official MIT or AVL release.
 

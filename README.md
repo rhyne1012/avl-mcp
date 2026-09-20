@@ -4,7 +4,7 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Version: 0.2.0 (no GitHub Release is created for this version).** Supports AVL **3.52** only. Native execution is
+**Version: 0.2.0.** Supports AVL **3.52** only. Native execution is
 tested on macOS Apple Silicon; other operating systems are not yet verified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
@@ -47,9 +47,10 @@ with `python -m build`; install the resulting wheel for the stdio acceptance tes
 Keep virtual environments and native libraries on each machine's local disk.
 Research inputs, results and logs can be stored in a separate project directory.
 
-A compatible prebuilt AVL 3.52 executable can also be used. The private project
-retains an optional [macOS arm64 native bundle](docs/native-installation.md); compiling
-AVL is not an inherent MCP requirement.
+A compatible prebuilt AVL 3.52 executable can also be used; compiling AVL is not
+an inherent MCP requirement. See [native installation](docs/native-installation.md).
+The v0.2.0 release contains the Python wheel, source distribution and checksums;
+AVL remains a separate installation.
 
 ### Building AVL on macOS Apple Silicon
 

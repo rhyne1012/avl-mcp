@@ -1,9 +1,9 @@
 # avl-mcp
 
-透過 MCP 執行 AVL 3.52 氣動分析。原有工具：
-`avl.health`、`avl.inspect`、`avl.validate`、`avl.run`、`avl.sweep`。
+透過 MCP 執行 AVL 3.52 氣動分析，提供十項工具，涵蓋單點分析、批次掃描、
+背景工作、取消／續跑、結果查詢及安裝診斷。
 
-套件版本為 `0.2.0`（本次不建立新的 GitHub Release），本機測試平台為 macOS Apple Silicon。
+套件版本為 `0.2.0`，本機測試平台為 macOS Apple Silicon。
 安裝與完整工具說明見 [英文 README](README.md)，驗證範圍見
 [驗證紀錄](docs/validation.md)。
 
@@ -56,7 +56,7 @@
 這些驗證建立軟體流程與數值一致性，不代表實機氣動精度。
 
 AVL 適用於薄升力面、細長體及準定常分析，不承諾失速、分離或跨音速精度。
-HS_UAV 與 VSPAERO 的同幾何比對另行進行，本程式庫不包含研究模型或 CFD 原始資料。
+本程式庫不包含私人研究模型或 CFD 原始資料；跨求解器比對屬於各使用者自己的驗證工作。
 
 ## 授權
 

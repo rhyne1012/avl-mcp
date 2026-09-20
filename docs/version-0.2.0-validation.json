@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "platform": "macOS arm64",
+  "change_scope": "Version metadata and documentation only; solver and analysis logic unchanged from 0.2.0.dev1.",
+  "implementation_sha256": "b84f9c2c3db4f088770d31f2f969aef6b890ac49527b66598986dca7511abcba",
+  "validation": {
+    "normal_wheel_build": "passed",
+    "normal_wheel_install": "passed",
+    "pip_check": "passed",
+    "cli_version": "0.2.0",
+    "stdio_tool_discovery_count": 10,
+    "stdio_calls": [
+      "avl.health",
+      "avl.validate",
+      "avl.run",
+      "avl.results"
+    ],
+    "official_case": "Plane Vanilla, Mach 0.2, alpha 3 degrees, zero other angles/rates/controls",
+    "CLtot": 0.6754170403902354,
+    "Cmtot": 0.1199155980932566,
+    "result_contract": "1.0.0",
+    "source_preserved": true
+  },
+  "prior_full_regression": "77 passed for 0.2.0.dev1; not rerun for this version-only change",
+  "github_release_created": false,
+  "desktop_registration_tested": false
+}

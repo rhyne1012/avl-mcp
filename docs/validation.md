@@ -1,4 +1,20 @@
-# Result contract and installation diagnostics validation
+# Version 0.2.0 validation
+
+Version `0.2.0` promotes the tested `0.2.0.dev1` implementation without analysis
+logic changes. Only the Python version string and package/documentation metadata
+change. No GitHub Release or tag is created.
+
+A normally built/installed wheel passes dependency checks, CLI version reporting,
+discovery of all ten MCP tools, and actual stdio health/validate/run/results calls.
+The official Plane Vanilla baseline (Mach 0.2, alpha 3 degrees) matches CLtot and
+Cmtot, preserves input files and returns result contract `1.0.0`. Saved queries
+execute no solver. [Machine-readable evidence](version-0.2.0-validation.json).
+
+The 77-test regression and 256-case background validation below belong to the
+preceding development snapshot; they are not rerun for this version-only change.
+Desktop registration remains a separate local deployment check.
+
+## Previous result contract and installation diagnostics validation
 
 Development snapshot: `0.2.0.dev1`, macOS arm64, Python 3.12, unmodified AVL 3.52.
 [Machine-readable evidence](contract-diagnostics-validation.json) records implementation

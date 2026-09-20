@@ -3,7 +3,7 @@
 透過 MCP 執行 AVL 3.52 氣動分析。原有工具：
 `avl.health`、`avl.inspect`、`avl.validate`、`avl.run`、`avl.sweep`。
 
-開發版本為 `0.2.0.dev0`（本次不建立新的 GitHub Release），本機測試平台為 macOS Apple Silicon。
+開發版本為 `0.2.0.dev1`（本次不建立新的 GitHub Release），本機測試平台為 macOS Apple Silicon。
 安裝與完整工具說明見 [英文 README](README.md)，驗證範圍見
 [驗證紀錄](docs/validation.md)。
 
@@ -38,6 +38,16 @@
 - CL 與 Cl 分別是升力與滾轉力矩，大小寫不能混淆。
 - 力矩參考點不一定是實機重心。總阻力、近場誘導阻力、Trefftz 誘導阻力分別保留。
 - `length_unit` 只標示單位，不會改變或轉換幾何尺寸。
+
+## 結果規格與診斷
+
+每個成功案例新增 `result_contract` 與 `result-contract.json`，記錄實際參考面積／弦長／翼展、力矩基準點、單位、座標及各導數定義。批次摘要與選定欄位查詢都帶有精簡 `result_context`。舊資料仍可讀取，缺少規格時明確標示，不補猜單位。原始值保留，風軸力係數換算另放 `derived.wind_forces`。
+
+官方 3.52 的兩個特殊行為也會在適用案例中回報：非零側滑搭配固定 CDp 時，原始力係數不完全符合單純旋轉；非零 p/r 時，部分 ST 迎角導數與固定穩定軸角速度的有限差分有差異。詳見[結果規格與原始碼依據](docs/result-contract.md)。MCP 不修改求解器或默默修正原始數值。
+
+`avl.health` 新增 Python 相依套件、執行檔／架構／函式庫資訊、工作目錄權限與啟動診斷。尚未連上 MCP 時，可用同一啟動入口加 `--diagnose` 取得 JSON；`--check-mcp` 會再啟動全新的 stdio 連線、列出工具並呼叫 health。這些檢查不修改 Codex 設定。
+
+診斷分開呈現原生啟動、數值案例、MCP 連接及桌面註冊；health 不會自行宣稱數值測試或 Codex 工具清單已更新。詳見[診斷流程](docs/diagnostics.md)。
 
 ## 驗證與限制
 

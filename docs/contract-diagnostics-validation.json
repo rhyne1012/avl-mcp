@@ -1,0 +1,47 @@
+{
+  "package_version": "0.2.0.dev1",
+  "result_contract_version": "1.0.0",
+  "diagnostic_schema_version": "1.0.0",
+  "platform": "Darwin arm64",
+  "python": "3.12.14",
+  "implementation_sha256": "40614021364b9a777a853b0e3d15b5382e7d791573e55cad1290e1c2fcdcf88c",
+  "solver_version": "3.52",
+  "solver_sha256": "88c657e6dfd6a4a7f27410041cf82b1564915dc8020d8326b553922ff0e9b7f3",
+  "validation": {
+    "pytest": {
+      "tests": "77",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "18.168"
+    },
+    "ruff": "passed",
+    "wheel_build": "passed",
+    "normal_wheel_install": "passed",
+    "pip_check": "passed",
+    "installed_code_matches_source": true,
+    "cli_fresh_stdio": "passed",
+    "exact_console_stdio_tools": [
+      "avl.cancel",
+      "avl.health",
+      "avl.inspect",
+      "avl.results",
+      "avl.resume",
+      "avl.run",
+      "avl.status",
+      "avl.submit",
+      "avl.sweep",
+      "avl.validate"
+    ],
+    "background_cases": 256,
+    "worker_survived_mcp_disconnect": true,
+    "numerical_health_tested": false,
+    "desktop_registration_tested": false
+  },
+  "native_limitations_documented": [
+    "NATIVE_FORCE_PROJECTION_DIFFERENCE",
+    "NATIVE_ST_ALPHA_NONZERO_RATES"
+  ],
+  "new_github_release": false,
+  "scope": "Official AVL models and connection/result semantics, unchanged numerical solver. No VSPAERO runs or research-model changes."
+}

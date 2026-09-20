@@ -51,6 +51,8 @@ def make_server(runner: AVLRunner) -> FastMCP:
                         "run_directory",
                         "total",
                         "source_preserved",
+                        "result_context",
+                        "derived",
                     )
                 }
                 for item in result["results"][:25]
@@ -72,8 +74,27 @@ def make_server(runner: AVLRunner) -> FastMCP:
         ),
     )
     async def health() -> CallToolResult:
-        """Check AVL 3.52 startup/version/headless exit; save probe logs. Not a numerical test."""
-        return await invoke(runner.health)
+        """Diagnose Python/native dependencies, architecture, directory permissions and AVL startup.
+        Save evidence. Numerical validation and desktop registry refresh remain separate.
+        """
+
+        def connected_health():
+            from .diagnostics import save_report
+
+            result = runner.health()
+            result["verification"]["mcp_connection"] = {
+                "status": "request_received",
+                "scope": "This MCP handler received the health call; "
+                "The client must confirm receipt. Other clients/registries are not audited.",
+            }
+            if (
+                "run_directory" in result
+                and result["checks"]["work_directory"]["status"] == "passed"
+            ):
+                save_report(result)
+            return result
+
+        return await invoke(connected_health)
 
     @server.tool(
         name="avl.inspect",

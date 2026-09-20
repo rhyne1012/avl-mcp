@@ -1,4 +1,29 @@
-# Batch and background-job validation
+# Result contract and installation diagnostics validation
+
+Development snapshot: `0.2.0.dev1`, macOS arm64, Python 3.12, unmodified AVL 3.52.
+[Machine-readable evidence](contract-diagnostics-validation.json) records implementation
+and executable hashes. No new GitHub Release is created.
+
+- **77 tests passed**, with the real native executable enabled and no skips.
+- Result units, actual references, body/stability axes, control definitions and
+  metadata survive saved queries without an executable. Old files remain readable.
+- Official cases test declared length units without scaling, nonzero sideslip,
+  reference overrides, independent body-force projections, SB velocity chain rules,
+  ST rate perturbations and selective output metadata.
+- Tests identify and retain two upstream 3.52 exceptions rather than silently
+  changing values: CDp at sideslip and ST alpha sensitivities at nonzero p/r.
+  See the [contract details](result-contract.md#upstream-352-exceptions-identified-during-validation).
+- Diagnostic tests cover absent/invalid executables, version mismatch, loader errors,
+  inaccessible work/input roots, missing Python dependencies and verification-layer separation.
+- Ruff, diff checks, wheel build, normal wheel installation and pip check pass.
+- The installed code hash matches tested source. CLI fresh stdio and the exact
+  installed console-command acceptance test pass. All ten tools and a 256-case
+  official-model background job pass, including disconnect/cancel/resume and queries
+  retaining result context. Health still reports numerical validation as not run.
+- Desktop registration is a separate deployment gate, not claimed by these tests.
+  Source/installation tests use official examples only, without VSPAERO execution.
+
+## Previous batch and background-job validation
 
 Development snapshot: `0.2.0.dev0`, validated on macOS arm64 with Python 3.12 and AVL 3.52.
 No new GitHub Release is created. [Machine-readable evidence](batch-jobs-validation.json)

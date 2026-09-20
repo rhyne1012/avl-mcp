@@ -376,10 +376,21 @@ class JobManager:
             item = fetch(candidate)
             row = {
                 k: item[k]
-                for k in ("success", "condition", "error", "outputs", "run_directory")
+                for k in (
+                    "success",
+                    "condition",
+                    "error",
+                    "outputs",
+                    "run_directory",
+                    "result_context",
+                )
                 if k in item
             }
             row["index"] = i
+            row.setdefault(
+                "result_context",
+                {"schema_version": None, "metadata_status": "unavailable_in_saved_result"},
+            )
             if fields is None:
                 row["total"] = item.get("total", {}).get("fields", {})
                 row["artifacts"] = item.get("artifacts", {})

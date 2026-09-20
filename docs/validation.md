@@ -1,18 +1,19 @@
-# Version 0.2.0 validation
+# Version 0.2.0 release validation
 
-Version `0.2.0` promotes the tested `0.2.0.dev1` implementation without analysis
-logic changes. Only the Python version string and package/documentation metadata
-change. No GitHub Release or tag is created.
+Version `0.2.0` keeps the analysis implementation from `0.2.0.dev1` unchanged.
+The final-version release checks were repeated on macOS arm64 with Python 3.12
+and unmodified AVL 3.52: **77 tests passed with no skips**.
 
-A normally built/installed wheel passes dependency checks, CLI version reporting,
-discovery of all ten MCP tools, and actual stdio health/validate/run/results calls.
-The official Plane Vanilla baseline (Mach 0.2, alpha 3 degrees) matches CLtot and
-Cmtot, preserves input files and returns result contract `1.0.0`. Saved queries
-execute no solver. [Machine-readable evidence](version-0.2.0-validation.json).
+The installed wheel is also exercised through a fresh stdio connection, including
+all ten tools and a 256-condition background job across disconnect, cancellation,
+resume and saved-result queries. See [release evidence](release-0.2.0-validation.json)
+for the final results and [release notes](release-0.2.0.md) for scope and limitations.
 
-The 77-test regression and 256-case background validation below belong to the
-preceding development snapshot; they are not rerun for this version-only change.
-Desktop registration remains a separate local deployment check.
+The earlier [version-promotion smoke test](version-0.2.0-validation.json) remains
+an unchanged historical record. It predates the decision to create a Release.
+A fresh stdio connection and an existing desktop client's registry are separate:
+the existing Codex session still requires a reload after its old server stopped.
+This does not indicate a failure of the freshly started release server.
 
 ## Previous result contract and installation diagnostics validation
 
@@ -117,7 +118,7 @@ be interpreted as a match to the differently shaped Plane Vanilla model.
 
 - Aerodynamic agreement with measured data, CFD or VSPAERO.
 - General mesh independence or uncertainty bounds; any grid check is case-specific.
-- HS_UAV geometry equivalence or control effectiveness.
+- Geometry equivalence or control effectiveness for private research aircraft.
 - Trim, eigenmodes, correct mass properties or full flight-dynamics models.
 - Windows/Linux execution or a running desktop client's registry refresh.
 

@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "platform": "macOS arm64",
+  "python": "3.12.14",
+  "avl": "3.52",
+  "implementation_sha256": "b84f9c2c3db4f088770d31f2f969aef6b890ac49527b66598986dca7511abcba",
+  "native_sha256": "88c657e6dfd6a4a7f27410041cf82b1564915dc8020d8326b553922ff0e9b7f3",
+  "pytest": {
+    "passed": 77,
+    "failed": 0,
+    "skipped": 0,
+    "seconds": 19.35,
+    "real_native_solver": true
+  },
+  "installed_wheel_stdio": {
+    "passed": true,
+    "tools": 10,
+    "background_cases": 256,
+    "disconnect_cancel_resume": true,
+    "saved_queries": true
+  },
+  "desktop_client": {
+    "status": "restart_required",
+    "observed": "Existing Codex connection returned Transport closed after old server retirement; fresh stdio passed."
+  },
+  "research_model_runs": false,
+  "cross_platform_validation": false
+}

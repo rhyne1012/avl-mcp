@@ -2,7 +2,8 @@
 
 The Python MCP package accepts an independently installed AVL 3.52 executable.
 Building AVL yourself is optional when a compatible executable is available.
-This private project also retains a tested native bundle for personal installation.
+The historical v0.1.0a1 release retains a tested native bundle. The v0.2.0 Python
+release uses a separate AVL installation and does not bundle the solver.
 
 ## Contents
 
@@ -15,7 +16,8 @@ machines have not been verified. The Python wheel does not contain these binarie
 
 ## Local installation
 
-1. Download the bundle and `SHA256SUMS.txt` from the same private GitHub release.
+1. Download the bundle and `SHA256SUMS.txt` from the historical v0.1.0a1 GitHub release, together with the
+   `avl-3.52-native-notices.zip` license/source supplement.
 2. Verify the archive against its SHA-256 entry.
 3. Extract it to a machine-local folder such as `~/Developer/Codex/tools/avl/3.52`.
    Use a new destination to preserve any existing installation.
@@ -37,8 +39,9 @@ session are separate checks; a client reload may be required.
 
 The bundle retains the original upstream AVL archive plus build instructions. The
 native package index records each library's conda-forge package URL and checksum;
-the retained recipe metadata identifies its upstream sources. Treat library licenses
-individually when preparing any redistribution beyond this personal archive.
+the retained recipe metadata identifies its upstream sources. The companion [source and license information](native-sources.md) identifies the
+exact upstream sources, retained patches/build recipes and full GPLv3 supplement.
+Keep all notices and corresponding source information when redistributing.
 
 No research aircraft geometry, private flight model, CFD workbook, credentials,
 or personal MCP configuration is included in the GitHub release.

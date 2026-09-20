@@ -4,7 +4,7 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Status: 0.1.0a1, phase-1 alpha.** Supports AVL **3.52** only. Native execution is
+**Status: 0.2.0.dev0, development snapshot (no new Release).** Supports AVL **3.52** only. Native execution is
 tested on macOS Apple Silicon; other operating systems are not yet verified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
@@ -18,9 +18,14 @@ This project is an independent wrapper, not an official MIT or AVL release.
 | `avl.inspect` | Read geometry, references, controls and file dependencies |
 | `avl.validate` | Check supported grammar, dependency paths and mesh budget |
 | `avl.run` | Calculate one prescribed condition, loads and ST/SB derivatives |
-| `avl.sweep` | Calculate 1-25 explicit conditions and save a CSV summary |
+| `avl.sweep` | Calculate 1-10000 explicit conditions with shared AVL processes and save CSV |
+| `avl.submit` | Snapshot inputs and start a detached background job |
+| `avl.status` | Read progress, counts and the actual job outcome |
+| `avl.cancel` | Cancel a queued/running job while retaining completed cases |
+| `avl.resume` | Verify saved inputs/results and recompute only missing or failed cases |
+| `avl.results` | Page and filter saved results without running AVL |
 
-Phase 1 does not expose trim, eigenmodes, geometry editing, interactive graphics,
+The connector does not expose trim, eigenmodes, geometry editing, interactive graphics,
 CAD conversion, or automatic OpenVSP comparison. The model validator checks input
 structure and basic invariants; it does not prove freedom from intersections or
 aerodynamic suitability. A successful process exit alone is never accepted as a result.
@@ -91,7 +96,8 @@ tool_timeout_sec = 660
 
 `--input-root` is optional. If supplied, model files must resolve inside that root.
 Dependencies must remain inside the model's own directory, even without this option.
-Set the client timeout above the requested analysis time budget.
+For synchronous calls, set the client timeout above the requested analysis time budget.
+For long analyses, use `avl.submit`; its short response does not wait for the solver.
 Equivalent environment variables are `AVL_BIN`, `AVL_MCP_WORK_ROOT`, and
 `AVL_MCP_INPUT_ROOT`. The default budget is 5,000 estimated vortices per case;
 `--max-vortices` can explicitly raise it up to 20,000. This is an estimate, not a RAM guarantee.
@@ -134,11 +140,69 @@ Unknown control names are rejected. Omitted controls and angular rates are zero.
 Omitted Mach uses the geometry header. Nearby `.run` and `.mass` files are
 intentionally not loaded in prescribed-condition analyses.
 
-Use `avl.sweep` with `model_path` and a `conditions` array. The total sweep budget
-is 300 seconds by default, each case is limited to at most 120 seconds, and
-execution stops on the first error unless `stop_on_error=false` is specified.
-Partial results and logs remain available. A partial sweep returns `isError=true`.
-The MCP response contains compact case summaries; full results are in `result.json`.
+Use `avl.sweep` with `model_path` and a `conditions` array. Its execution budget is
+300 seconds by default (one total budget, not a separate allowance per condition).
+Cases are grouped by Mach to reuse AVL's matrix factorization and returned in the
+original request order. Each native process handles at most 128 conditions; the
+connector explicitly resets every angular rate and control at every point.
+Execution stops on the first error unless `stop_on_error=false`; remaining cases
+then use a fresh process. Timeout/cancellation always stops the attempt.
+The MCP response includes at most 25 case summaries; use `avl.results` to page the rest.
+Completed cases and failed-attempt logs remain available. A partial synchronous
+sweep returns `isError=true`. Full results are in `result.json`.
+
+### Select outputs
+
+`avl.run`, `avl.sweep` and `avl.submit` accept `outputs`. Omit it to retain the
+previous complete output set. Use `["total"]` for forces/moments only, or e.g.
+`["total", "body"]` to add body-axis derivatives. Supported tables are `total`,
+`stability`, `body`, `surfaces`, `strips`. Total output is always retained to verify
+that AVL used the requested conditions. Skipped tables are not generated or
+parsed; querying one later reports `FIELD_NOT_AVAILABLE` rather than rerunning AVL.
+
+### Durable background jobs
+
+Call `avl.submit` with the same model/conditions/output selection as a sweep.
+It returns a `job_id`; use that ID with `avl.status`, `avl.cancel`, `avl.resume`
+and `avl.results`. Workers run independently of the MCP connection and keep their
+state under `<work-root>/jobs/`. At most two background jobs execute at once per
+work root; additional workers wait. Synchronous calls are outside this queue.
+
+`avl.status` returns `queued`, `running`, `completed`, `failed`, `cancelled` or
+`interrupted`, completed/failed counts, and the last error. `success=true` means
+**the status query succeeded**, not that the solver job passed. Cancellation is
+cooperative: query until acknowledged. Only that worker's owned AVL process is
+stopped. Completed cases and all native attempts are retained.
+
+An inactive job can be resumed from another MCP connection using the same work
+root and implementation. Resume checks original geometry and dependencies,
+staged input hashes, settings, executable hash, and the MCP implementation hash.
+Changed inputs/solver/code require a new job. Valid successful case checkpoints
+are reused; missing/damaged outputs and failed cases are recomputed. Timeouts
+apply per execution attempt (excluding queue time); resume grants the same budget
+again. A worker lost during startup may take up to 30 seconds to be identified.
+Do not edit/remove active job files. Cross-machine/network-filesystem locking is
+not established; use one host per work root.
+
+Query coefficients without invoking a solver:
+
+```json
+{
+  "job_id": "<id returned by submit, run or sweep>",
+  "indices": [0, 3, 8],
+  "fields": ["total.fields.CLtot", "body.derivatives.Cmq"],
+  "offset": 0,
+  "limit": 20
+}
+```
+
+`avl.results` pages cases in original index order (limit 1-100); `indices` filters
+that list. Dotted field names preserve case, e.g. `stability.control_derivatives.elevator.Cm`.
+With no `fields`, each row includes total coefficients and saved artifact paths,
+including strip CSV/JSON when requested. Unfinished cases are absent, not zeros.
+Large responses are rejected with a request to narrow the selection. Results can
+be read even when the AVL executable is unavailable. For older runs, the directory
+basename is the run ID. Job control tools apply only to background jobs.
 
 Optional `references` must specify all six values: `sref`, `cref`, `bref`, `xref`,
 `yref`, `zref`. Overrides affect only the staged copy. Cref, Bref, and the three
@@ -148,12 +212,14 @@ For the official Bubble Dancer example, the supplied mass file documents inches.
 
 ## Results and conventions
 
-Every execution creates a unique directory below `<work-root>/runs/` containing:
+Synchronous executions use `<work-root>/runs/`; background jobs use `<work-root>/jobs/`.
+Each job retains native process folders and separate per-case outputs:
 
 - Original input snapshots, staged geometry and dependencies, and SHA-256 records.
 - `manifest.json`, exact `commands.txt`, `stdout.log`, `stderr.log`, `process.json`.
-- Raw `total.mrf`, `stability.mrf`, `body.mrf`, `surface.mrf`, `strips.mrf`.
-- Parsed `result.json`, `strips.json` and `strips.csv`; sweeps add `summary.csv`.
+- Raw `total.mrf` and the other selected MRF tables.
+- Parsed `result.json`; selected strips add `strips.json`/`strips.csv`, synchronous sweeps add `summary.csv`.
+- Background input snapshots, atomic per-case checkpoints, attempt records and worker logs.
 
 The parser requires MRF `VERSION 1.0`, complete tables and finite numerical values.
 It distinguishes missing/truncated output, solver diagnostics, version mismatch,
@@ -181,7 +247,7 @@ for neutral point/spiral parameter are returned as JSON `null`, not physical val
 ## Limits and validation
 
 AVL is a thin lifting-surface, slender-body and quasi-steady potential-flow model.
-It does not establish stall, separated-flow or transonic accuracy. Phase 1 accepts
+It does not establish stall, separated-flow or transonic accuracy. The connector accepts
 0 <= Mach < 0.7 and warns on large angles/high Mach; those limits do not certify
 physical accuracy. Numerical agreement between wrappers or solvers is not flight validation.
 
@@ -204,8 +270,6 @@ Native tests are explicitly skipped if `AVL_BIN` is absent. Use
 
 ## Roadmap
 
-- Benchmark matching lifting-surface geometry against VSPAERO, with aligned axes,
-  references, conditions and separately assessed body representations.
 - Add trim and eigenmode analysis with appropriate mass/inertia validation.
 - Add controlled geometry generation and previews after the analysis interface stabilizes.
 

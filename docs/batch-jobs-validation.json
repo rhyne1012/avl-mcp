@@ -1,0 +1,99 @@
+{
+  "package_version": "0.2.0.dev0",
+  "implementation_sha256": "c0196096201c5d0885f7187e535d80ba63ae8ce6797330c8564ee8d63aa60267",
+  "platform": "macOS arm64",
+  "python": "3.12",
+  "pytest": {
+    "passed": 57,
+    "failed": 0,
+    "native_solver_enabled": true
+  },
+  "ruff": "passed",
+  "normal_wheel_build": "passed",
+  "pip_check": "passed",
+  "mcp_stdio": {
+    "tools": [
+      "avl.cancel",
+      "avl.health",
+      "avl.inspect",
+      "avl.results",
+      "avl.resume",
+      "avl.run",
+      "avl.status",
+      "avl.submit",
+      "avl.sweep",
+      "avl.validate"
+    ],
+    "worker_survived_disconnect": true,
+    "completed_before_disconnect": 1,
+    "background_cases": 256,
+    "cancel_resume": "passed",
+    "selective_query": "passed",
+    "desktop_registration_tested": false
+  },
+  "benchmark": {
+    "success": true,
+    "platform": "Darwin",
+    "architecture": "arm64",
+    "solver_sha256": "88c657e6dfd6a4a7f27410041cf82b1564915dc8020d8326b553922ff0e9b7f3",
+    "results": [
+      {
+        "model": "vanilla",
+        "model_sha256": "28ccdc714456379de6e3f5f5edacfedf45a915484fb4bac646f335c864d339b2",
+        "conditions": 24,
+        "outputs": [
+          "total"
+        ],
+        "mach": 0.2,
+        "repeats": [
+          {
+            "isolated_seconds": 0.683218999998644,
+            "shared_seconds": 0.2492226249887608
+          },
+          {
+            "isolated_seconds": 0.668325292004738,
+            "shared_seconds": 0.2653157910099253
+          },
+          {
+            "isolated_seconds": 0.672018334036693,
+            "shared_seconds": 0.258208375016693
+          }
+        ],
+        "median_isolated_seconds": 0.672018334036693,
+        "median_shared_seconds": 0.258208375016693,
+        "median_speedup": 2.6026202054571135,
+        "max_abs_field_difference": 0.0
+      },
+      {
+        "model": "bd",
+        "model_sha256": "25539370e2f338d401018acc674eb52a4170dd36e9489ce7f1d3c939279962f5",
+        "conditions": 24,
+        "outputs": [
+          "total"
+        ],
+        "mach": 0.2,
+        "repeats": [
+          {
+            "isolated_seconds": 1.2752885000081733,
+            "shared_seconds": 0.4798317499808036
+          },
+          {
+            "isolated_seconds": 1.2616406250162981,
+            "shared_seconds": 0.48172579100355506
+          },
+          {
+            "isolated_seconds": 1.2827711249701679,
+            "shared_seconds": 0.5020400839857757
+          }
+        ],
+        "median_isolated_seconds": 1.2752885000081733,
+        "median_shared_seconds": 0.48172579100355506,
+        "median_speedup": 2.647332826734124,
+        "max_abs_field_difference": 0.0
+      }
+    ],
+    "scope": "Host-specific end-to-end runner timing, unchanged official meshes; no promised speedup for other models or a desktop transport."
+  },
+  "release_created": false,
+  "scope": "Connector behavior and internal numerical agreement; native validation limited to macOS arm64."
+}

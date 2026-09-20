@@ -1,4 +1,4 @@
-"""Verify all five tools using an actual installed MCP command and official cases."""
+"""Verify all ten tools using an actual installed MCP command and official cases."""
 
 import argparse
 import asyncio
@@ -20,7 +20,18 @@ async def verify(args):
         env={"PATH": os.environ.get("PATH", "/usr/bin:/bin")},
     )
     records = []
-    names = {"avl.health", "avl.inspect", "avl.validate", "avl.run", "avl.sweep"}
+    names = {
+        "avl.health",
+        "avl.inspect",
+        "avl.validate",
+        "avl.run",
+        "avl.sweep",
+        "avl.submit",
+        "avl.status",
+        "avl.cancel",
+        "avl.resume",
+        "avl.results",
+    }
     with (root / "logs/mcp-stderr.log").open("w") as err:
         async with stdio_client(params, errlog=err) as (reader, writer):
             async with ClientSession(reader, writer) as session:
@@ -71,6 +82,77 @@ async def verify(args):
                     if name == "avl.run" and expected:
                         total = result.structuredContent["total"]["fields"]
                         assert abs(total["CLtot"] - 0.6754170403902354) < 1e-8
+                submitted = await session.call_tool(
+                    "avl.submit",
+                    {
+                        "model_path": str(args.vanilla.resolve()),
+                        "conditions": [{"alpha_deg": i % 7, "mach": 0.2} for i in range(256)],
+                        "outputs": ["total"],
+                        "case_name": "stdio-background",
+                        "timeout_seconds": 120,
+                    },
+                )
+                assert not submitted.isError, submitted
+                job_id = submitted.structuredContent["job_id"]
+                for _ in range(200):
+                    state = (
+                        await session.call_tool("avl.status", {"job_id": job_id})
+                    ).structuredContent
+                    if state["completed_count"] > 0:
+                        break
+                    await asyncio.sleep(0.025)
+                assert state["state"] == "running", state
+                before_disconnect = state["completed_count"]
+        # Destroy the first MCP process; the detached worker must remain accessible.
+        async with stdio_client(params, errlog=err) as (reader, writer):
+            async with ClientSession(reader, writer) as session:
+                await session.initialize()
+                state = (
+                    await session.call_tool("avl.status", {"job_id": job_id})
+                ).structuredContent
+                assert state["completed_count"] >= before_disconnect
+                cancelled = await session.call_tool("avl.cancel", {"job_id": job_id})
+                assert not cancelled.isError
+                for _ in range(400):
+                    state = (
+                        await session.call_tool("avl.status", {"job_id": job_id})
+                    ).structuredContent
+                    if state["state"] in ("cancelled", "completed"):
+                        break
+                    assert state["state"] in ("queued", "running"), state
+                    await asyncio.sleep(0.025)
+                assert state["state"] in ("cancelled", "completed"), state
+                await asyncio.sleep(0.05)
+                resumed = await session.call_tool("avl.resume", {"job_id": job_id})
+                assert not resumed.isError, resumed
+                for _ in range(1200):
+                    state = (
+                        await session.call_tool("avl.status", {"job_id": job_id})
+                    ).structuredContent
+                    if state["state"] == "completed":
+                        break
+                    assert state["state"] in ("queued", "running"), state
+                    await asyncio.sleep(0.05)
+                assert state["state"] == "completed" and state["completed_count"] == 256, state
+                query = await session.call_tool(
+                    "avl.results",
+                    {"job_id": job_id, "indices": [0, 3], "fields": ["total.fields.CLtot"]},
+                )
+                assert not query.isError and len(query.structuredContent["rows"]) == 2
+                assert (
+                    abs(
+                        query.structuredContent["rows"][1]["fields"]["total.fields.CLtot"]
+                        - 0.6754170403902354
+                    )
+                    < 1e-8
+                )
+                absent = await session.call_tool(
+                    "avl.results", {"job_id": job_id, "fields": ["body.derivatives.Cmq"]}
+                )
+                assert (
+                    absent.isError
+                    and absent.structuredContent["error"]["code"] == "FIELD_NOT_AVAILABLE"
+                )
                 report = {
                     "success": True,
                     "server_info": initialized.serverInfo.model_dump(),
@@ -78,12 +160,26 @@ async def verify(args):
                     "args": params.args,
                     "tools_discovered": sorted(names),
                     "calls": records,
+                    "background_job_id": job_id,
+                    "worker_survived_mcp_disconnect": True,
+                    "completed_before_disconnect": before_disconnect,
+                    "final_status": state,
+                    "query": query.structuredContent,
                     "desktop_registration_tested": False,
                 }
                 (root / "reports/mcp-stdio-validation.json").write_text(
                     json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
                 )
-                print(json.dumps({"success": True, "tools": sorted(names), "calls": len(records)}))
+                print(
+                    json.dumps(
+                        {
+                            "success": True,
+                            "tools": sorted(names),
+                            "background_cases": 256,
+                            "reconnection": True,
+                        }
+                    )
+                )
 
 
 def main():

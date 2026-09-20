@@ -1,4 +1,4 @@
-"""Five phase-1 tools over MCP stdio; solver output is always captured to files."""
+"""Ten tools over MCP stdio; solver output is always captured to files."""
 
 import functools
 import json
@@ -7,17 +7,21 @@ import anyio
 from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
-from .models import AVLFailure, FlightCondition, LengthUnit, References
+from .jobs import JobManager
+from .models import AVLFailure, FlightCondition, LengthUnit, OutputKind, References
 from .runner import AVLRunner
 
 
 def make_server(runner: AVLRunner) -> FastMCP:
+    jobs = JobManager(runner)
     server = FastMCP(
         "avl-mcp",
         instructions=(
             "AVL 3.52 prescribed-condition aerodynamics. Use avl.validate before runs. "
             "Inputs: geometry X aft/Y right/Z up; rates in standard BODY axes. "
             "No implicit .run/.mass loading, trim or mode analysis. "
+            "Use avl.submit/status/cancel/resume for durable long-running jobs; "
+            "avl.results reads saved results without invoking AVL. "
             "Use returned artifacts for complete results and original solver logs."
         ),
     )
@@ -40,6 +44,8 @@ def make_server(runner: AVLRunner) -> FastMCP:
                     if k
                     in (
                         "success",
+                        "index",
+                        "outputs",
                         "error",
                         "condition",
                         "run_directory",
@@ -47,8 +53,11 @@ def make_server(runner: AVLRunner) -> FastMCP:
                         "source_preserved",
                     )
                 }
-                for item in result["results"]
+                for item in result["results"][:25]
             ]
+            result["returned_count"] = len(result["results"])
+            result["results_truncated"] = result.get("attempted_count", 0) > 25
+            result["next_offset"] = 25 if result["results_truncated"] else None
         text = json.dumps(result, ensure_ascii=False, allow_nan=False)
         return CallToolResult(
             content=[TextContent(type="text", text=text)],
@@ -99,6 +108,7 @@ def make_server(runner: AVLRunner) -> FastMCP:
         case_name: str = "case",
         timeout_seconds: float = 120,
         length_unit: LengthUnit = "unspecified",
+        outputs: list[OutputKind] | None = None,
     ) -> CallToolResult:
         """Run one prescribed flight condition. Return forces, ST/SB derivatives, surface
         loads and links to strip CSV/JSON. Angles in degrees, rates nondimensional BODY
@@ -106,7 +116,14 @@ def make_server(runner: AVLRunner) -> FastMCP:
         A references override changes only the staged copy. Ignores nearby .run/.mass.
         """
         return await invoke(
-            runner.run, model_path, condition, references, case_name, timeout_seconds, length_unit
+            runner.run,
+            model_path,
+            condition,
+            references,
+            case_name,
+            timeout_seconds,
+            length_unit,
+            outputs,
         )
 
     @server.tool(
@@ -123,9 +140,12 @@ def make_server(runner: AVLRunner) -> FastMCP:
         timeout_seconds: float = 300,
         length_unit: LengthUnit = "unspecified",
         stop_on_error: bool = True,
+        outputs: list[OutputKind] | None = None,
     ) -> CallToolResult:
-        """Run 1-25 explicit conditions sequentially within one total time budget.
-        Preserve successful and failed cases and write summary.csv. Each case is isolated.
+        """Run 1-10000 conditions in shared AVL processes, grouped by Mach, within one budget.
+        Return cases in requested order; reset all rates and controls at every condition.
+        Select outputs (total is always retained); None preserves all previous tables.
+        Preserve successful and failed cases and write summary.csv. For long jobs use submit.
         Return partial results and isError=true if any requested case is unsuccessful.
         """
         return await invoke(
@@ -137,6 +157,96 @@ def make_server(runner: AVLRunner) -> FastMCP:
             timeout_seconds,
             length_unit,
             stop_on_error,
+            outputs,
         )
+
+    @server.tool(
+        name="avl.submit",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+        ),
+    )
+    async def submit(
+        model_path: str,
+        conditions: list[FlightCondition],
+        references: References | None = None,
+        case_name: str = "job",
+        timeout_seconds: float = 1800,
+        length_unit: LengthUnit = "unspecified",
+        stop_on_error: bool = True,
+        outputs: list[OutputKind] | None = None,
+    ) -> CallToolResult:
+        """Snapshot inputs and start a detached local AVL job; return job_id immediately.
+        1-10000 cases, at most two background workers execute per work root. Workers survive
+        MCP client disconnection. Timeout is the execution budget per attempt, excluding queue.
+        outputs=['total'] skips derivatives/surface/strip output; None requests all tables.
+        """
+        return await invoke(
+            jobs.submit,
+            model_path,
+            conditions,
+            references,
+            case_name,
+            timeout_seconds,
+            length_unit,
+            stop_on_error,
+            outputs,
+        )
+
+    @server.tool(
+        name="avl.status",
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    async def status(job_id: str) -> CallToolResult:
+        """Read queued/running/completed/failed/cancelled/interrupted state and case counts.
+        success=true means the status was read; inspect state/error for solver outcome.
+        """
+        return await invoke(jobs.status, job_id)
+
+    @server.tool(
+        name="avl.cancel",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    async def cancel(job_id: str) -> CallToolResult:
+        """Request cooperative cancellation of this job's worker and its owned AVL process.
+        Completed cases and logs remain. Query status until cancellation is acknowledged.
+        """
+        return await invoke(jobs.cancel, job_id)
+
+    @server.tool(
+        name="avl.resume",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+        ),
+    )
+    async def resume(job_id: str) -> CallToolResult:
+        """Resume an inactive job after verifying input, solver, implementation and output hashes.
+        Recompute only failed, missing or damaged cases. Active jobs cannot be resumed.
+        """
+        return await invoke(jobs.resume, job_id)
+
+    @server.tool(
+        name="avl.results",
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    async def results(
+        job_id: str,
+        offset: int = 0,
+        limit: int = 20,
+        fields: list[str] | None = None,
+        indices: list[int] | None = None,
+    ) -> CallToolResult:
+        """Page saved background or run/sweep results without running AVL. Limit 1-100 cases.
+        Filter by original zero-based indices and dotted fields, e.g. total.fields.CLtot,
+        body.derivatives.Cmq, stability.control_derivatives.elevator.Cm. Missing tables
+        return FIELD_NOT_AVAILABLE; raw/strip artifact paths remain available by default.
+        """
+        return await invoke(jobs.results, job_id, offset, limit, fields, indices)
 
     return server

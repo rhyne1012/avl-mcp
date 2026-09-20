@@ -27,7 +27,7 @@ class FlightCondition(BaseModel):
         default=None,
         ge=0,
         lt=0.7,
-        description="None uses the geometry header; phase 1 requires M<0.7.",
+        description="None uses the geometry header; the connector requires M<0.7.",
     )
     pb_2v: float = Field(default=0.0, ge=-0.1, le=0.1)
     qc_2v: float = Field(default=0.0, ge=-0.03, le=0.03)
@@ -56,3 +56,13 @@ class References(BaseModel):
 
 
 LengthUnit = Literal["m", "ft", "in", "unspecified"]
+OutputKind = Literal["total", "stability", "body", "surfaces", "strips"]
+ALL_OUTPUTS = ("total", "stability", "body", "surfaces", "strips")
+
+
+def output_selection(outputs=None):
+    """Totals are always retained so every solved condition can be verified."""
+    chosen = set(ALL_OUTPUTS if outputs is None else outputs) | {"total"}
+    if chosen - set(ALL_OUTPUTS):
+        raise AVLFailure("INVALID_OUTPUT_SELECTION", "Unknown output table.")
+    return [name for name in ALL_OUTPUTS if name in chosen]

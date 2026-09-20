@@ -127,7 +127,10 @@ def test_zero_exit_is_not_success(tmp_path, vanilla, marker):
 
 
 def test_sweep_partial_failure(tmp_path, vanilla):
-    body = "import sys\nsys.stdin.read()\nprint('Athena Vortex Lattice Program Version 3.52')\n"
+    body = (
+        "import sys\nfor line in sys.stdin:\n if line.startswith('FT '): break\n"
+        "print('Athena Vortex Lattice Program Version 3.52')\n"
+    )
     out = AVLRunner(fake_binary(tmp_path, body), str(tmp_path)).sweep(
         str(vanilla), [FlightCondition(alpha_deg=a) for a in (0, 2, 4)]
     )

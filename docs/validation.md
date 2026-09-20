@@ -1,4 +1,37 @@
-# Phase-1 validation
+# Batch and background-job validation
+
+Development snapshot: `0.2.0.dev0`, validated on macOS arm64 with Python 3.12 and AVL 3.52.
+No new GitHub Release is created. [Machine-readable evidence](batch-jobs-validation.json)
+records the tested implementation hash, tool coverage and host-specific timings.
+
+- 57 tests pass with the native AVL executable enabled; Ruff and wheel build pass.
+- Plane Vanilla and Bubble Dancer shared-process cases agree with isolated runs to
+  the tests' absolute tolerance of 1e-10, including Mach regrouping, reference
+  overrides, nonzero body rates, controls, and resetting them to zero.
+- A 130-condition run covers the former 25-case limit and the 128-case process boundary.
+- Deterministic solver fixtures exercise partial failure/restart, timeout, two-worker
+  scheduling, queued/running cancellation, worker interruption, saved-result corruption,
+  selective queries, and rejection of changed input/snapshot/solver/job settings.
+- A normally installed wheel passes all ten tools over real MCP stdio. A 256-condition
+  official-model background job survives termination of the first MCP process,
+  supports cancellation/resumption from a new connection, and finishes all cases.
+  Querying an unrequested output reports an explicit error without another solver run.
+- Desktop registration and the user's active MCP environment are not changed by this validation.
+
+For 24 prescribed conditions at Mach 0.2 with total output only, three repetitions
+on unchanged official meshes gave median speedups of **2.60x (Plane Vanilla)** and
+**2.65x (Bubble Dancer)**. Every compared total-output field matched exactly in this
+benchmark. These are end-to-end runner timings on this host, including input staging,
+process startup and parsing; they are not a performance guarantee for other workloads.
+
+Reproduce the benchmark with:
+
+```sh
+python scripts/benchmark_batch.py --avl-bin /absolute/path/to/avl \
+  --work-root /absolute/path/to/benchmark --examples examples/official
+```
+
+## Earlier phase-1 validation
 
 Scope: AVL 3.52 prescribed-condition analysis and official example geometries.
 Host: macOS Apple Silicon, double-precision GNU Fortran build of upstream 3.52.

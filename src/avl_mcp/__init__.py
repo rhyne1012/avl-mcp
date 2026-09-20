@@ -1,3 +1,3 @@
-"""AVL MCP, phase 1: inspection and prescribed-condition aerodynamic analysis."""
+"""AVL MCP: reproducible prescribed-condition analyses and durable local jobs."""
 
-__version__ = "0.1.0a1"
+__version__ = "0.2.0.dev0"

@@ -16,7 +16,6 @@ from pathlib import Path
 from . import __version__
 from .geometry import Geometry, inspect_geometry, sha256
 from .models import AVLFailure, FlightCondition, References
-from .outputs import parse_derivatives, parse_strips, parse_surfaces, parse_total
 
 SUPPORTED_AVL = "3.52"
 ERROR_PATTERNS = (
@@ -156,6 +155,7 @@ class AVLRunner:
             result = AVLFailure("EXECUTION_OR_IO_ERROR", str(exc)).result() | {
                 "run_directory": str(job)
             }
+        result["job_id"] = job.name
         dump(job / "result.json", result)
         return result
 
@@ -176,7 +176,7 @@ class AVLRunner:
                 f"configured limit {self.max_vortices}.",
             )
         if len(obj.controls) > 30:
-            raise AVLFailure("CONTROL_LIMIT", "At most 30 controls are supported in phase 1.")
+            raise AVLFailure("CONTROL_LIMIT", "At most 30 controls are supported.")
 
     def _stage(self, obj: Geometry, job: Path, references: References | None) -> dict:
         lines = list(obj.raw_lines)
@@ -216,84 +216,41 @@ class AVLRunner:
         }
 
     @staticmethod
-    def _commands(obj: Geometry, condition: FlightCondition) -> str:
-        mach = obj.mach if condition.mach is None else condition.mach
-        # Fresh process with no argv prevents implicit .run/.mass loading. Upstream 3.52
-        # starts in NASA stability-rate axes; O/R explicitly selects NASA body-rate axes.
-        lines = [
-            "PLOP",
-            "G",
-            "",
-            "LOAD model.avl",
-            "CINI",
-            "OPER",
-            "O",
-            "R",
-            "",
-            "M",
-            f"MN {mach:.15g}",
-            "",
-            f"A A {condition.alpha_deg:.15g}",
-            f"B B {condition.beta_deg:.15g}",
-            f"R R {condition.pb_2v:.15g}",
-            f"P P {condition.qc_2v:.15g}",
-            f"Y Y {condition.rb_2v:.15g}",
-        ]
-        lines.extend(
-            f"D{i} D{i} {condition.controls.get(name, 0):.15g}"
-            for i, name in enumerate(obj.controls, 1)
+    def _commands(obj, condition, outputs=None):
+        from .execution import condition_commands, startup_commands
+        from .models import output_selection
+
+        return "\n".join(
+            startup_commands()
+            + condition_commands(obj, condition, output_selection(outputs))
+            + ["", "QUIT", ""]
         )
-        lines += [
-            "MRF",
-            "X",
-            "FT total.mrf",
-            "ST stability.mrf",
-            "SB body.mrf",
-            "FN surface.mrf",
-            "FS strips.mrf",
-            "",
-            "QUIT",
-            "",
-        ]
-        return "\n".join(lines)
 
     def run(
         self,
-        model_path: str,
-        condition: FlightCondition | None = None,
-        references: References | None = None,
+        model_path,
+        condition=None,
+        references=None,
         case_name="case",
         timeout_seconds=120.0,
         length_unit="unspecified",
-    ) -> dict:
+        outputs=None,
+    ):
+        from .execution import collect_case, validate_request
+
         if not math.isfinite(timeout_seconds) or not 0.1 <= timeout_seconds <= 600:
             raise AVLFailure("INVALID_TIMEOUT", "Timeout must be between 0.1 and 600 seconds.")
-        if length_unit not in ("m", "ft", "in", "unspecified"):
-            raise AVLFailure("INVALID_UNITS", "Length unit must be m, ft, in or unspecified.")
         obj = inspect_geometry(model_path, self.input_root)
-        self._check_model(obj)
         condition = condition or FlightCondition()
-        unknown = set(condition.controls) - set(obj.controls)
-        if unknown:
-            raise AVLFailure(
-                "UNKNOWN_CONTROL",
-                f"Unknown controls: {sorted(unknown)}",
-                available_controls=obj.controls,
-            )
-        mach = obj.mach if condition.mach is None else condition.mach
-        if not 0 <= mach < 0.7:
-            raise AVLFailure("MACH_LIMIT", "Phase 1 requires 0 <= Mach < 0.7.")
+        selected = validate_request(
+            self, obj, [condition], references, outputs, length_unit, timeout_seconds
+        )
         job = self._new_job(case_name)
-        warnings = list(obj.warnings)
-        if abs(condition.alpha_deg) > 10 or abs(condition.beta_deg) > 5 or mach > 0.6:
-            warnings.append(
-                "Condition approaches/exceeds small-disturbance assumptions; "
-                "no stall, separation or transonic accuracy is implied."
-            )
         manifest = {
             "package_version": __version__,
             "model": obj.report(),
             "condition": condition.model_dump(),
+            "outputs": selected,
             "references_override": references.model_dump() if references else None,
             "geometry_length_unit": length_unit,
             "case_name": case_name,
@@ -303,205 +260,128 @@ class AVLRunner:
         try:
             manifest.update(self._stage(obj, job, references))
             dump(job / "manifest.json", manifest)
-            process = self._process(job, self._commands(obj, condition), timeout_seconds)
-            total = parse_total(job / "total.mrf")
-            stability = parse_derivatives(job / "stability.mrf", "DERMATS")
-            body = parse_derivatives(job / "body.mrf", "DERMATB")
-            surfaces = parse_surfaces(job / "surface.mrf")
-            strips = parse_strips(job / "strips.mrf")
-            actual = total["fields"]
-            expected = {
-                "Alpha": condition.alpha_deg,
-                "Beta": condition.beta_deg,
-                "Mach": mach,
-                "pb/2V": condition.pb_2v,
-                "qc/2V": condition.qc_2v,
-                "rb/2V": condition.rb_2v,
-            }
-            refs = references.model_dump() if references else obj.references
-            expected.update({k[0].upper() + k[1:]: v for k, v in refs.items()})
-            for name, value in expected.items():
-                if not math.isclose(actual[name], value, rel_tol=1e-9, abs_tol=1e-10):
-                    raise AVLFailure(
-                        "CONDITION_MISMATCH",
-                        f"Requested {name}={value}, solver used {actual[name]}.",
-                    )
-            desired_controls = {name: condition.controls.get(name, 0) for name in obj.controls}
-            if set(total["controls"]) != set(desired_controls) or any(
-                not math.isclose(total["controls"][k], v, rel_tol=1e-12, abs_tol=1e-12)
-                for k, v in desired_controls.items()
-            ):
-                raise AVLFailure(
-                    "CONDITION_MISMATCH", "Solver control settings do not match request."
-                )
-            if (
-                len(surfaces) != total["counts"]["surfaces"]
-                or sum(len(s["rows"]) for s in strips) != total["counts"]["strips"]
-            ):
-                raise AVLFailure("OUTPUT_FORMAT", "Inconsistent output table dimensions.")
-            changed = [
-                p
-                for p, h in manifest["sources"].items()
-                if not Path(p).is_file() or sha256(Path(p)) != h
-            ]
-            if changed:
-                raise AVLFailure(
-                    "SOURCE_CHANGED", "Original source changed during the run.", paths=changed
-                )
-            dump(job / "strips.json", strips)
-            with (job / "strips.csv").open("w", newline="") as stream:
-                writer = csv.DictWriter(stream, fieldnames=["surface"] + list(strips[0]["rows"][0]))
-                writer.writeheader()
-                for surf in strips:
-                    writer.writerows({"surface": surf["name"], **row} for row in surf["rows"])
-            result = {
-                "success": True,
-                "run_directory": str(job),
-                "solver": process,
-                "condition": condition.model_dump(),
-                "geometry_length_unit": length_unit,
-                "total": total,
-                "stability": stability,
-                "body": body,
-                "surfaces": surfaces,
-                "strip_count": total["counts"]["strips"],
-                "warnings": warnings,
-                "conventions": {
-                    "geometry": "X aft, Y right, Z up",
-                    "input_rates": "standard body axes: X forward, Y right, Z down",
-                    "totals": "CX/CY/CZ and Cl/Cm/Cn: standard body; CL/CD: stability; "
-                    "Cl'/Cn': standard stability",
-                    "drag": "CDind is near-field induced; CDff is Trefftz induced; "
-                    "CDvis uses supplied profile drag, not a viscous flow solution",
-                    "moment_reference": "Xref/Yref/Zref; not necessarily aircraft CG",
-                },
-                "artifacts": {
+            process = self._process(job, self._commands(obj, condition, selected), timeout_seconds)
+            result = collect_case(job, obj, condition, references, selected, length_unit)
+            self._check_sources(manifest["sources"])
+            result.update(solver=process, source_preserved=True)
+            result["artifacts"].update(
+                {
                     name: str(job / name)
                     for name in (
                         "manifest.json",
                         "commands.txt",
                         "stdout.log",
                         "stderr.log",
-                        "total.mrf",
-                        "stability.mrf",
-                        "body.mrf",
-                        "surface.mrf",
-                        "strips.mrf",
-                        "strips.csv",
-                        "strips.json",
                         "result.json",
                     )
-                },
-                "source_preserved": True,
-            }
+                }
+            )
         except AVLFailure as exc:
-            result = exc.result() | {
-                "run_directory": str(job),
-                "manifest": str(job / "manifest.json"),
-            }
+            result = exc.result() | {"run_directory": str(job)}
         except (OSError, UnicodeError, ValueError, IndexError, KeyError) as exc:
             result = AVLFailure("EXECUTION_OR_PARSE_ERROR", str(exc)).result() | {
                 "run_directory": str(job)
             }
+        result["job_id"] = job.name
         dump(job / "result.json", result)
         return result
 
+    @staticmethod
+    def _check_sources(sources):
+        changed = [p for p, h in sources.items() if not Path(p).is_file() or sha256(Path(p)) != h]
+        if changed:
+            raise AVLFailure("SOURCE_CHANGED", "Original input changed.", paths=changed)
+
     def sweep(
         self,
-        model_path: str,
-        conditions: list[FlightCondition],
-        references: References | None = None,
+        model_path,
+        conditions,
+        references=None,
         case_name="sweep",
         timeout_seconds=300.0,
         length_unit="unspecified",
         stop_on_error=True,
-    ) -> dict:
-        if not 1 <= len(conditions) <= 25:
-            raise AVLFailure("SWEEP_LIMIT", "Supply 1-25 explicit conditions.")
-        if not math.isfinite(timeout_seconds) or not 1 <= timeout_seconds <= 1800:
-            raise AVLFailure("INVALID_TIMEOUT", "Sweep timeout must be between 1 and 1800 seconds.")
+        outputs=None,
+    ):
+        from .execution import execute_cases, validate_request
+
         obj = inspect_geometry(model_path, self.input_root)
-        self._check_model(obj)
-        for c in conditions:
-            if set(c.controls) - set(obj.controls):
-                raise AVLFailure(
-                    "UNKNOWN_CONTROL", "A sweep condition references unknown controls."
-                )
+        selected = validate_request(
+            self, obj, conditions, references, outputs, length_unit, timeout_seconds
+        )
         job = self._new_job(case_name)
-        baseline = {str(obj.path): obj.source_hash} | {
+        sources = {str(obj.path): obj.source_hash} | {
             d["path"]: d["sha256"] for d in obj.dependencies
         }
         dump(
             job / "manifest.json",
             {
                 "model_path": str(obj.path),
-                "source_hashes": baseline,
+                "source_hashes": sources,
                 "conditions": [c.model_dump() for c in conditions],
+                "outputs": selected,
+                "references_override": references.model_dump() if references else None,
+                "length_unit": length_unit,
                 "total_timeout_seconds": timeout_seconds,
             },
         )
         started = time.monotonic()
-        results = []
-        error = None
-        for i, c in enumerate(conditions):
-            remaining = timeout_seconds - (time.monotonic() - started)
-            if remaining < 0.1:
-                error = {"code": "TIMEOUT", "message": "Total sweep time limit reached."}
-                break
-            if any(not Path(p).is_file() or sha256(Path(p)) != h for p, h in baseline.items()):
-                error = {"code": "SOURCE_CHANGED", "message": "Input changed between sweep cases."}
-                break
-            try:
-                item = self.run(
-                    model_path,
-                    c,
-                    references,
-                    f"{case_name[:40]}_{i:03d}",
-                    min(120.0, remaining),
-                    length_unit,
-                )
-            except AVLFailure as exc:
-                item = exc.result()
-            results.append(item)
-            if not item["success"] and stop_on_error:
-                error = item["error"]
-                break
-        complete = len(results) == len(conditions)
-        result = {
-            "success": complete and all(x["success"] for x in results),
-            "requested_count": len(conditions),
-            "attempted_count": len(results),
-            "completed_count": sum(x["success"] for x in results),
-            "results": results,
-            "run_directory": str(job),
-            "elapsed_seconds": time.monotonic() - started,
-            "summary_csv": str(job / "summary.csv"),
-        }
-        if error:
-            result["error"] = error
-        elif not result["success"]:
-            result["error"] = {"code": "PARTIAL_FAILURE", "message": "Some sweep cases failed."}
-        with (job / "summary.csv").open("w", newline="") as stream:
-            writer = csv.DictWriter(
-                stream,
-                fieldnames=[
-                    "index",
-                    "success",
-                    "alpha_deg",
-                    "beta_deg",
-                    "Mach",
-                    "CLtot",
-                    "CDtot",
-                    "CDff",
-                    "Cmtot",
-                    "CYtot",
-                    "Cltot",
-                    "Cntot",
-                    "run_directory",
-                ],
+
+        def checkpoint(index, item):
+            self._check_sources(sources)
+            path = job / f"case-{index:05d}.json"
+            dump(path, item)
+
+        try:
+            result = execute_cases(
+                self,
+                job,
+                obj,
+                conditions,
+                references,
+                selected,
+                length_unit,
+                timeout_seconds,
+                stop_on_error,
+                on_case=checkpoint,
             )
+            self._check_sources(sources)
+        except (AVLFailure, OSError) as exc:
+            failure = (
+                exc
+                if isinstance(exc, AVLFailure)
+                else AVLFailure("EXECUTION_OR_IO_ERROR", str(exc))
+            )
+            result = failure.result() | {"run_directory": str(job), "results": []}
+            for path in sorted(job.glob("case-*.json")):
+                result["results"].append(json.loads(path.read_text()))
+            result.update(
+                requested_count=len(conditions),
+                attempted_count=len(result["results"]),
+                completed_count=sum(r["success"] for r in result["results"]),
+            )
+        result["elapsed_seconds"] = time.monotonic() - started
+        result["summary_csv"] = str(job / "summary.csv")
+        fields = [
+            "index",
+            "success",
+            "alpha_deg",
+            "beta_deg",
+            "Mach",
+            "CLtot",
+            "CDtot",
+            "CDff",
+            "Cmtot",
+            "CYtot",
+            "Cltot",
+            "Cntot",
+            "run_directory",
+        ]
+        with (job / "summary.csv").open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=fields)
             writer.writeheader()
-            for i, item in enumerate(results):
+            for item in result["results"]:
+                i = item["index"]
                 vals = item.get("total", {}).get("fields", {})
                 writer.writerow(
                     {
@@ -509,21 +389,10 @@ class AVLRunner:
                         "success": item["success"],
                         "alpha_deg": conditions[i].alpha_deg,
                         "beta_deg": conditions[i].beta_deg,
-                        **{
-                            k: vals.get(k)
-                            for k in (
-                                "Mach",
-                                "CLtot",
-                                "CDtot",
-                                "CDff",
-                                "Cmtot",
-                                "CYtot",
-                                "Cltot",
-                                "Cntot",
-                            )
-                        },
+                        **{k: vals.get(k) for k in fields[4:-1]},
                         "run_directory": item.get("run_directory"),
                     }
                 )
+        result["job_id"] = job.name
         dump(job / "result.json", result)
         return result

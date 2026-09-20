@@ -1,0 +1,6 @@
+include LICENSE README.md README.zh-TW.md THIRD_PARTY_NOTICES.md
+include requirements-phase1.lock
+recursive-include docs *.md *.json *.lock
+recursive-include examples *.avl *.dat *.run *.mass
+recursive-include scripts *.py
+recursive-include tests *.py *.mrf

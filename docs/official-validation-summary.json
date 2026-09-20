@@ -1,0 +1,252 @@
+{
+  "success": true,
+  "solver": {
+    "returncode": 0,
+    "version": "3.52",
+    "display_unset": true,
+    "executable_sha256": "88c657e6dfd6a4a7f27410041cf82b1564915dc8020d8326b553922ff0e9b7f3"
+  },
+  "source_archive_sha256": "0b588ecea9222f5b625d0af0c87ae31daf3cdba1532cf0bbb36f93d6e854849b",
+  "baseline": {
+    "condition": {
+      "alpha_deg": 3.0,
+      "beta_deg": 0.0,
+      "mach": 0.2,
+      "pb_2v": 0.0,
+      "qc_2v": 0.0,
+      "rb_2v": 0.0,
+      "controls": {}
+    },
+    "total": {
+      "format": "AVL MRF 1.0",
+      "model_title": "Plane Vanilla",
+      "counts": {
+        "surfaces": 5,
+        "strips": 41,
+        "vortices": 294
+      },
+      "fields": {
+        "Sref": 9.0,
+        "Cref": 0.9,
+        "Bref": 10.0,
+        "Xref": 0.5,
+        "Yref": 0.0,
+        "Zref": 0.0,
+        "Alpha": 3.0,
+        "pb/2V": -0.0,
+        "p'b/2V": -0.0,
+        "Beta": 0.0,
+        "qc/2V": 0.0,
+        "Mach": 0.2,
+        "rb/2V": -0.0,
+        "r'b/2V": -0.0,
+        "CXtot": 0.02363362208442679,
+        "Cltot": -5.584305714366859e-17,
+        "Cl'tot": -5.576155988451918e-17,
+        "CYtot": -1.415705777856786e-17,
+        "Cmtot": 0.1199155980932566,
+        "CZtot": -0.6751053606126832,
+        "Cntot": 9.489250779349837e-20,
+        "Cn'tot": 3.017362256052767e-18,
+        "CLtot": 0.6754170403902354,
+        "CDtot": 0.01173105158566566,
+        "CDvis": 0.0,
+        "CDind": 0.01173105158566566,
+        "CLff": 0.6724066238208698,
+        "CDff": 0.0129862974060513,
+        "CYff": -2.05301378086228e-17,
+        "e": 0.9974043501769878
+      },
+      "controls": {
+        "flap": 0.0,
+        "aileron": 0.0,
+        "elevator": 0.0,
+        "rudder": 0.0
+      },
+      "axis_orientation": "Standard axis orientation,  X fwd, Z down"
+    }
+  },
+  "derivatives": [
+    {
+      "variable": "alpha_deg",
+      "coefficient": "CLtot",
+      "reported": 4.980084799923054,
+      "central_difference": 4.980084750831733,
+      "relative_error": 9.857526992894038e-09,
+      "step": 0.01
+    },
+    {
+      "variable": "alpha_deg",
+      "coefficient": "Cmtot",
+      "reported": -0.6348591303240443,
+      "central_difference": -0.6348591174311908,
+      "relative_error": 2.030821143729553e-08,
+      "step": 0.01
+    },
+    {
+      "variable": "beta_deg",
+      "coefficient": "CYtot",
+      "reported": -0.2708920541023301,
+      "central_difference": -0.2708920486012152,
+      "relative_error": 2.030740589705928e-08,
+      "step": 0.01
+    },
+    {
+      "variable": "qc_2v",
+      "coefficient": "Cmtot",
+      "reported": -21.6597520166105,
+      "central_difference": -21.659752016610494,
+      "relative_error": 3.280474934409207e-16,
+      "step": 0.0001
+    },
+    {
+      "variable": "pb_2v",
+      "coefficient": "Cltot",
+      "reported": -0.5745840715334778,
+      "central_difference": -0.5745840715335004,
+      "relative_error": 3.941729474314811e-14,
+      "step": 0.0001
+    },
+    {
+      "variable": "rb_2v",
+      "coefficient": "Cntot",
+      "reported": -0.04266078554298479,
+      "central_difference": -0.04266078554297545,
+      "relative_error": 2.1893059576337253e-13,
+      "step": 0.0001
+    },
+    {
+      "variable": "elevator",
+      "coefficient": "Cmtot",
+      "reported": -0.02834402045362707,
+      "central_difference": -0.02834402045362519,
+      "relative_error": 6.634345508730489e-14,
+      "step": 0.01
+    },
+    {
+      "variable": "aileron",
+      "coefficient": "Cl'tot",
+      "reported": 0.009038785234096154,
+      "central_difference": 0.009038785234096588,
+      "relative_error": 4.7979994851328966e-14,
+      "step": 0.01
+    }
+  ],
+  "official_sweeps": {
+    "vanilla": {
+      "rows": [
+        {
+          "alpha_deg": -2.0,
+          "CLtot": 0.2389785894572135,
+          "Cmtot": 0.1601446372500179,
+          "CDind": 0.00170021536108094,
+          "CDff": 0.002158243243446821,
+          "CDvis": 0.0
+        },
+        {
+          "alpha_deg": 0.0,
+          "CLtot": 0.4138420607312963,
+          "Cmtot": 0.1477261733177228,
+          "CDind": 0.004293288052859522,
+          "CDff": 0.005086247243376126,
+          "CDvis": 0.0
+        },
+        {
+          "alpha_deg": 2.0,
+          "CLtot": 0.5883900693348472,
+          "Cmtot": 0.1303965953078765,
+          "CDind": 0.008777580376469465,
+          "CDff": 0.009888919045631005,
+          "CDvis": 0.0
+        },
+        {
+          "alpha_deg": 4.0,
+          "CLtot": 0.7622106884283331,
+          "Cmtot": 0.1082403311825798,
+          "CDind": 0.01515696867512242,
+          "CDff": 0.01654286051595374,
+          "CDvis": 0.0
+        },
+        {
+          "alpha_deg": 6.0,
+          "CLtot": 0.9348929927186125,
+          "Cmtot": 0.08136532403351143,
+          "CDind": 0.02341214017430282,
+          "CDff": 0.02501565432035278,
+          "CDvis": 0.0
+        }
+      ]
+    },
+    "bd": {
+      "rows": [
+        {
+          "alpha_deg": -2.0,
+          "CLtot": 0.2339447247000285,
+          "Cmtot": 0.05603786960914837,
+          "CDind": 0.001524677084411681,
+          "CDff": 0.0015579545025087,
+          "CDvis": 0.017
+        },
+        {
+          "alpha_deg": 0.0,
+          "CLtot": 0.436234483939318,
+          "Cmtot": 0.02793117879108146,
+          "CDind": 0.00443705722046471,
+          "CDff": 0.004461387327220506,
+          "CDvis": 0.017
+        },
+        {
+          "alpha_deg": 2.0,
+          "CLtot": 0.6382726831090837,
+          "Cmtot": -0.002137169848766678,
+          "CDind": 0.009381699663670771,
+          "CDff": 0.00932845701811537,
+          "CDvis": 0.017
+        },
+        {
+          "alpha_deg": 4.0,
+          "CLtot": 0.8395986420065111,
+          "Cmtot": -0.03402068633828254,
+          "CDind": 0.01637067764223219,
+          "CDff": 0.01613545170089538,
+          "CDvis": 0.017
+        },
+        {
+          "alpha_deg": 6.0,
+          "CLtot": 1.039751831684204,
+          "Cmtot": -0.06756403739004904,
+          "CDind": 0.02539105027729722,
+          "CDff": 0.02484920838170273,
+          "CDvis": 0.017
+        }
+      ]
+    }
+  },
+  "mesh_sensitivity": [
+    {
+      "panel_multiplier_each_direction": 1,
+      "vortices": 294,
+      "CLtot": 0.6754170403902354,
+      "Cmtot": 0.1199155980932566,
+      "CDind": 0.01173105158566566,
+      "CDff": 0.0129862974060513
+    },
+    {
+      "panel_multiplier_each_direction": 2,
+      "vortices": 1176,
+      "CLtot": 0.6810936325654454,
+      "Cmtot": 0.09333506826017697,
+      "CDind": 0.01098053909388923,
+      "CDff": 0.01327104026011008
+    },
+    {
+      "panel_multiplier_each_direction": 3,
+      "vortices": 2646,
+      "CLtot": 0.6851669024994732,
+      "Cmtot": 0.07790372556335295,
+      "CDind": 0.01086046904126206,
+      "CDff": 0.01345034909118373
+    }
+  ],
+  "scope": "Official examples; internal derivative consistency and limited mesh sensitivity. Not experimental, CFD, VSPAERO, or general mesh-independence validation."
+}

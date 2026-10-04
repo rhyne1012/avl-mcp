@@ -4,13 +4,18 @@ import argparse
 import asyncio
 import json
 import os
+import subprocess
 from pathlib import Path
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
+from avl_mcp import __version__
+
 
 async def verify(args):
+    version = subprocess.check_output([str(args.command), "--version"], text=True).strip()
+    assert version == f"avl-mcp {__version__}", version
     root = args.work_root.resolve()
     (root / "reports").mkdir(parents=True, exist_ok=True)
     (root / "logs").mkdir(exist_ok=True)
@@ -143,7 +148,8 @@ async def verify(args):
                         break
                     assert state["state"] in ("queued", "running"), state
                     await asyncio.sleep(0.025)
-                assert state["state"] in ("cancelled", "completed"), state
+                assert state["state"] == "cancelled", state
+                cancelled_count = state["completed_count"]
                 await asyncio.sleep(0.05)
                 resumed = await session.call_tool("avl.resume", {"job_id": job_id})
                 assert not resumed.isError, resumed
@@ -181,6 +187,7 @@ async def verify(args):
                 )
                 report = {
                     "success": True,
+                    "package_version": __version__,
                     "server_info": initialized.serverInfo.model_dump(),
                     "command": params.command,
                     "args": params.args,
@@ -189,6 +196,8 @@ async def verify(args):
                     "background_job_id": job_id,
                     "worker_survived_mcp_disconnect": True,
                     "completed_before_disconnect": before_disconnect,
+                    "cancellation_acknowledged": True,
+                    "completed_at_cancellation": cancelled_count,
                     "final_status": state,
                     "query": query.structuredContent,
                     "desktop_registration_tested": False,

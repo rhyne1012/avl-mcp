@@ -1,0 +1,32 @@
+{
+  "version": "0.3.0",
+  "date": "2026-10-05",
+  "platform": "Darwin arm64",
+  "python": "3.12.14",
+  "native_version": "3.52",
+  "native_sha256": "88c657e6dfd6a4a7f27410041cf82b1564915dc8020d8326b553922ff0e9b7f3",
+  "regression": {
+    "tests": 299,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "installed_wheel": {
+    "source_matches": true,
+    "pip_check": true,
+    "package_version": "0.3.0",
+    "tools": 10,
+    "background_cases": 256,
+    "worker_survived_disconnect": true,
+    "cancellation_acknowledged": true,
+    "completed_at_cancellation": 20
+  },
+  "dependencies": {
+    "mcp": "1.30.0",
+    "pydantic": "2.13.5",
+    "pytest": "9.1.1"
+  },
+  "desktop_runtime_updated": false,
+  "research_model_runs": false,
+  "github_actions": "See checks on the PR commit; this file records local acceptance only."
+}

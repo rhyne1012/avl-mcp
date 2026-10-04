@@ -8,6 +8,29 @@ from avl_mcp.runner import AVLRunner
 REPO = Path(__file__).resolve().parents[1]
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--require-native", action="store_true", help="Fail if real AVL is unavailable"
+    )
+
+
+def pytest_configure(config):
+    if config.getoption("--require-native"):
+        binary = os.environ.get("AVL_BIN")
+        if not binary or not Path(binary).is_file() or not os.access(binary, os.X_OK):
+            raise pytest.UsageError(
+                "--require-native needs an executable AVL_BIN; acceptance incomplete"
+            )
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--require-native") and not any(
+        item.get_closest_marker("native") for item in items
+    ):
+        raise pytest.UsageError("--require-native needs native tests in the selected collection")
+
+
 @pytest.fixture
 def vanilla():
     return REPO / "examples/official/vanilla/vanilla.avl"

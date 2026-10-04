@@ -4,11 +4,15 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Version: 0.2.0.** Supports AVL **3.52** only. Native execution is
+**Version: 0.3.0.** Supports AVL **3.52** only. Native execution is
 tested on macOS Apple Silicon; other operating systems are not yet verified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
-[繁體中文說明](README.zh-TW.md) · [Validation](docs/validation.md)
+[繁體中文說明](README.zh-TW.md) · [Documentation index](docs/README.md) · [Validation](docs/validation.md)
+
+Version 0.3.0 rejects incomplete or inconsistent MRF tables and adds automated
+Python regression plus real AVL acceptance. See [changes](docs/release-0.3.0.md)
+and [how to reproduce acceptance](docs/automated-validation.md).
 
 ## Tools
 
@@ -49,8 +53,9 @@ Research inputs, results and logs can be stored in a separate project directory.
 
 A compatible prebuilt AVL 3.52 executable can also be used; compiling AVL is not
 an inherent MCP requirement. See [native installation](docs/native-installation.md).
-The v0.2.0 release contains the Python wheel, source distribution and checksums;
-AVL remains a separate installation.
+Python release artifacts are a wheel, source distribution and checksums;
+AVL remains a separate installation. The existing optional native bundle is
+retained on the [v0.1.0a1 release](https://github.com/rhyne1012/avl-mcp/releases/tag/v0.1.0a1).
 
 ### Building AVL on macOS Apple Silicon
 
@@ -242,6 +247,9 @@ Each job retains native process folders and separate per-case outputs:
 - Background input snapshots, atomic per-case checkpoints, attempt records and worker logs.
 
 The parser requires MRF `VERSION 1.0`, complete tables and finite numerical values.
+It verifies all 30 ST or 36 SB derivatives, every declared CONTROL/DESIGN column,
+integer counts, unique fields, load indices and matching load references. Missing
+rows, duplicate records and truncated DESIGN tails fail instead of returning partial success.
 It distinguishes missing/truncated output, solver diagnostics, version mismatch,
 timeouts, changed input, and requested-versus-actual condition mismatch.
 Logs go to files, never to the MCP protocol's stdout channel.

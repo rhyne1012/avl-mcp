@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "avl-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Reproducible AVL aerodynamic analyses through Model Context Protocol"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,6 +12,7 @@ license = "GPL-2.0-or-later"
 dependencies = ["mcp>=1.20,<2", "pydantic>=2.11,<3"]
 
 [project.optional-dependencies]
+test = ["pytest>=8,<10", "ruff>=0.14", "build"]
 dev = ["pytest>=8,<10", "ruff>=0.14", "build", "matplotlib>=3.8"]
 
 [project.scripts]
@@ -30,4 +31,3 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
-

@@ -1,4 +1,26 @@
-# Version 0.2.0 release validation
+# Validation status and history
+
+## Version 0.3.0
+
+The local macOS arm64 / Python 3.12 / AVL 3.52 regression runs **299 tests with
+zero failures or skips**, including systematic removal, duplication, empty and
+nonfinite records in ST/SB tables. Real native tests additionally cover DESIGN
+variables with no CONTROL variables. Normal result keys, units, native numbers
+and result contract 1.0.0 are retained.
+
+See [automated acceptance](automated-validation.md) for the current workflow and
+required gates, [0.3.0 changes](release-0.3.0.md), and the
+[documentation index](README.md). Remote checks are attached to each PR/commit;
+workflow source alone is not evidence of a passing run.
+
+The [local acceptance record](version-0.3.0-validation.json) also records a normally
+installed wheel, all ten tools and 256 completed background cases after confirmed
+cancellation and resume. It does not claim desktop deployment or a remote CI pass.
+
+The records below describe their original versions and are retained as history.
+In particular, an old desktop restart observation is not a live connection test.
+
+## Historical version 0.2.0 release validation
 
 Version `0.2.0` keeps the analysis implementation from `0.2.0.dev1` unchanged.
 The final-version release checks were repeated on macOS arm64 with Python 3.12

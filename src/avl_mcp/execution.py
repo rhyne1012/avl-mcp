@@ -12,7 +12,7 @@ import uuid
 from .contract import attach_contract
 from .geometry import sha256
 from .models import AVLFailure, output_selection
-from .outputs import parse_derivatives, parse_strips, parse_surfaces, parse_total
+from .outputs import check_load_header, parse_derivatives, parse_strips, parse_surfaces, parse_total
 from .runner import ERROR_PATTERNS, SUPPORTED_AVL, dump
 
 CONVENTIONS = {
@@ -132,10 +132,12 @@ def collect_case(folder, obj, condition, references, outputs, length_unit):
             check_total(parse_total(path, record), obj, condition, references)
             result[kind] = parse_derivatives(path, record)
     if "surfaces" in outputs:
+        check_load_header(folder / "surface.mrf", "SURF", total)
         result["surfaces"] = parse_surfaces(folder / "surface.mrf")
         if len(result["surfaces"]) != total["counts"]["surfaces"]:
             raise AVLFailure("OUTPUT_FORMAT", "Surface count mismatch.")
     if "strips" in outputs:
+        check_load_header(folder / "strips.mrf", "STRP", total)
         strips = parse_strips(folder / "strips.mrf")
         if sum(len(s["rows"]) for s in strips) != total["counts"]["strips"]:
             raise AVLFailure("OUTPUT_FORMAT", "Strip count mismatch.")

@@ -1,4 +1,4 @@
-"""Verify all ten tools using an actual installed MCP command and official cases."""
+"""Verify all eleven tools using an installed MCP command and official cases."""
 
 import argparse
 import asyncio
@@ -30,12 +30,24 @@ async def verify(args):
         "avl.inspect",
         "avl.validate",
         "avl.run",
+        "avl.trim",
         "avl.sweep",
         "avl.submit",
         "avl.status",
         "avl.cancel",
         "avl.resume",
         "avl.results",
+    }
+    trim_request = {
+        "control": "elevator",
+        "target_cl": 0.6,
+        "target_cm": 0.0,
+        "mach": 0.2,
+        "alpha_bounds_deg": [-10, 15],
+        "control_bounds": [-30, 30],
+        "fixed_controls": {"flap": 2.0},
+        "cl_tolerance": 1e-6,
+        "cm_tolerance": 1e-6,
     }
     with (root / "logs/mcp-stderr.log").open("w") as err:
         async with stdio_client(params, errlog=err) as (reader, writer):
@@ -50,6 +62,16 @@ async def verify(args):
                     ("avl.health", {}, True),
                     ("avl.inspect", {"model_path": str(args.vanilla.resolve())}, True),
                     ("avl.validate", {"model_path": str(args.bd.resolve())}, True),
+                    (
+                        "avl.trim",
+                        {
+                            "model_path": str(args.vanilla.resolve()),
+                            "request": trim_request,
+                            "case_name": "mcp-vanilla-trim",
+                            "outputs": ["total"],
+                        },
+                        True,
+                    ),
                     (
                         "avl.run",
                         {
@@ -109,6 +131,82 @@ async def verify(args):
                         )
                         total = result.structuredContent["total"]["fields"]
                         assert abs(total["CLtot"] - 0.6754170403902354) < 1e-8
+                    if name == "avl.trim" and expected:
+                        trim_result = result.structuredContent
+                        trim = trim_result["trim"]
+                        assert trim_result["analysis_type"] == "longitudinal_trim"
+                        assert trim["schema_version"] == "1.0.0"
+                        assert trim["accepted"] and trim["within_bounds"], trim
+                        assert trim["verification"]["status"] == "passed", trim
+                        assert abs(trim["residuals"]["CL"]) <= trim_request["cl_tolerance"]
+                        assert abs(trim["residuals"]["Cm"]) <= trim_request["cm_tolerance"]
+                        solved = trim_result["condition"]
+                        assert solved == trim["solved_condition"]
+                        assert solved["mach"] == 0.2
+                        assert solved["controls"]["flap"] == 2.0
+                        assert all(solved[key] == 0 for key in (
+                            "beta_deg", "pb_2v", "qc_2v", "rb_2v"
+                        ))
+                        assert trim_result["result_contract"]["schema_version"] == "1.0.0"
+                trim_query = await session.call_tool(
+                    "avl.results",
+                    {
+                        "job_id": trim_result["job_id"],
+                        "fields": [
+                            "condition.controls.elevator",
+                            "trim.residuals.CL",
+                            "trim.residuals.Cm",
+                            "trim.accepted",
+                            "trim.verification.status",
+                        ],
+                    },
+                )
+                assert not trim_query.isError, trim_query
+                saved_trim = trim_query.structuredContent
+                assert saved_trim["solver_executed"] is False
+                assert len(saved_trim["rows"]) == 1
+                saved_fields = saved_trim["rows"][0]["fields"]
+                assert saved_fields["trim.accepted"] is True
+                assert saved_fields["trim.verification.status"] == "passed"
+                for name in ("CL", "Cm"):
+                    assert (
+                        saved_fields[f"trim.residuals.{name}"]
+                        == trim_result["trim"]["residuals"][name]
+                    )
+                solved_control = trim_result["condition"]["controls"]["elevator"]
+                assert saved_fields["condition.controls.elevator"] == solved_control
+                # Change only the acceptance interval so it excludes the native solution.
+                rejected_args = {
+                    "model_path": str(args.vanilla.resolve()),
+                    "request": {
+                        **trim_request,
+                        "control_bounds": [solved_control + 1, solved_control + 2],
+                    },
+                    "case_name": "mcp-vanilla-trim-out-of-bounds",
+                    "outputs": ["total"],
+                }
+                rejected = await session.call_tool("avl.trim", rejected_args)
+                records.append({
+                    "tool": "avl.trim", "arguments": rejected_args,
+                    "response": rejected.model_dump(mode="json"),
+                })
+                assert rejected.isError, rejected
+                rejection = rejected.structuredContent
+                assert rejection["success"] is False
+                assert rejection["error"]["code"] == "TRIM_OUT_OF_BOUNDS", rejection
+                assert rejection["trim"]["accepted"] is False
+                assert rejection["trim"]["within_bounds"] is False
+                rejected_query = await session.call_tool(
+                    "avl.results", {"job_id": rejection["job_id"]}
+                )
+                assert not rejected_query.isError, rejected_query
+                saved_rejection = rejected_query.structuredContent
+                assert saved_rejection["solver_executed"] is False
+                assert len(saved_rejection["rows"]) == 1
+                failed_row = saved_rejection["rows"][0]
+                assert failed_row["success"] is False
+                assert failed_row["error"]["code"] == "TRIM_OUT_OF_BOUNDS"
+                assert failed_row["trim"]["accepted"] is False
                 submitted = await session.call_tool(
                     "avl.submit",
                     {
@@ -193,6 +291,8 @@ async def verify(args):
                     "args": params.args,
                     "tools_discovered": sorted(names),
                     "calls": records,
+                    "trim_saved_query": saved_trim,
+                    "rejected_trim_saved_query": saved_rejection,
                     "background_job_id": job_id,
                     "worker_survived_mcp_disconnect": True,
                     "completed_before_disconnect": before_disconnect,
@@ -211,6 +311,8 @@ async def verify(args):
                             "success": True,
                             "tools": sorted(names),
                             "background_cases": 256,
+                            "trim_verified": True,
+                            "out_of_bounds_trim_rejected": True,
                             "reconnection": True,
                         }
                     )

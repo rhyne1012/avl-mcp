@@ -88,7 +88,8 @@ def condition_commands(obj, condition, outputs, prefix="", set_mach=True):
     return lines
 
 
-def check_total(total, obj, condition, references):
+def check_total(total, obj, condition, references, *, free_alpha=False, free_control=None):
+    """Check fixed inputs. Only trim's candidate check may release its two unknowns."""
     actual = total["fields"]
     expected = {
         "Alpha": condition.alpha_deg,
@@ -98,6 +99,8 @@ def check_total(total, obj, condition, references):
         "qc/2V": condition.qc_2v,
         "rb/2V": condition.rb_2v,
     }
+    if free_alpha:
+        expected.pop("Alpha")
     refs = references.model_dump() if references else obj.references
     expected.update({k[0].upper() + k[1:]: v for k, v in refs.items()})
     for name, value in expected.items():
@@ -107,7 +110,8 @@ def check_total(total, obj, condition, references):
             )
     desired = {name: condition.controls.get(name, 0) for name in obj.controls}
     if set(total["controls"]) != set(desired) or any(
-        not math.isclose(total["controls"][k], v, rel_tol=1e-12, abs_tol=1e-12)
+        k != free_control
+        and not math.isclose(total["controls"][k], v, rel_tol=1e-12, abs_tol=1e-12)
         for k, v in desired.items()
     ):
         raise AVLFailure("CONDITION_MISMATCH", "Solver control settings do not match request.")

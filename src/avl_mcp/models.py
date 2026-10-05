@@ -55,6 +55,39 @@ class References(BaseModel):
     zref: float
 
 
+class TrimRequest(BaseModel):
+    """Two native unknowns: alpha and one CONTROL, at zero beta/body rates.
+
+    Bounds accept or reject a native solution; they do not constrain AVL's iterations.
+    CONTROL bounds use the geometry's variable units, not inferred physical angles.
+    """
+
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    control: str = Field(min_length=1, max_length=80)
+    target_cl: float
+    mach: float = Field(ge=0, lt=0.7)
+    alpha_bounds_deg: tuple[float, float]
+    control_bounds: tuple[float, float]
+    target_cm: float = 0.0
+    fixed_controls: dict[str, float] = Field(default_factory=dict)
+    cl_tolerance: float = Field(default=1e-6, gt=0)
+    cm_tolerance: float = Field(default=1e-6, gt=0)
+
+    @field_validator("alpha_bounds_deg", "control_bounds")
+    @classmethod
+    def ordered_bounds(cls, value, info):
+        lower, upper = value
+        maximum = 30 if info.field_name == "alpha_bounds_deg" else 180
+        if not -maximum <= lower < upper <= maximum:
+            raise ValueError(f"Require -{maximum} <= lower < upper <= {maximum}.")
+        return value
+
+    @field_validator("fixed_controls")
+    @classmethod
+    def finite_fixed_controls(cls, value):
+        return FlightCondition(controls=value).controls
+
+
 LengthUnit = Literal["m", "ft", "in", "unspecified"]
 OutputKind = Literal["total", "stability", "body", "surfaces", "strips"]
 ALL_OUTPUTS = ("total", "stability", "body", "surfaces", "strips")

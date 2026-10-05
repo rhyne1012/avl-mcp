@@ -383,6 +383,8 @@ class JobManager:
                     "outputs",
                     "run_directory",
                     "result_context",
+                    "analysis_type",
+                    "trim",
                 )
                 if k in item
             }

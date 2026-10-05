@@ -91,7 +91,7 @@ jobs:
           python -m pytest -q --require-native --junitxml=reports/native.xml
           python scripts/check_test_report.py reports/native.xml
       - run: python -m build
-      - name: Installed-wheel ten-tool acceptance
+      - name: Installed-wheel eleven-tool acceptance including trim
         run: |
           python -m venv "$RUNNER_TEMP/installed"
           "$RUNNER_TEMP/installed/bin/python" -m pip install dist/*.whl

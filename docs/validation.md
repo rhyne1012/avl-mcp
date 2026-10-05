@@ -1,6 +1,29 @@
 # Validation status and history
 
-## Version 0.3.0
+## Version 0.4.0 implementation
+
+Local macOS arm64 / Python 3.12 / AVL 3.52 acceptance passed **365 tests with
+zero failures or skips**, including 66 trim tests and 27 native tests in total.
+Ruff, wheel/source builds, normal wheel installation and dependency checks passed.
+All 13 installed Python source files match the tested implementation.
+The [local evidence summary](version-0.4.0-validation.json) records eleven-tool
+stdio acceptance, independent trim verification and 256 background cases.
+
+The new `avl.trim` regression covers native longitudinal CL/Cm constraints,
+CONTROL gain/sign semantics, fixed controls, reference overrides, bounds and
+failure handling. Installed-wheel acceptance exercises all eleven tools,
+including a successful trim with independent replay, saved trim queries and a
+rejected out-of-bounds solution. The existing 256-condition background
+disconnect/cancel/resume scenario remains part of that acceptance.
+
+Current pass counts and execution evidence are recorded in the exact commit's
+test reports and GitHub checks. This section describes the added acceptance
+scope; it does not by itself certify a test run. See [0.4.0 changes](release-0.4.0.md),
+[trim semantics](trim.md) and [reproduction instructions](automated-validation.md).
+Preparing and merging this implementation does not assert GitHub release
+publication, local runtime replacement or desktop registry refresh.
+
+## Historical version 0.3.0
 
 The local macOS arm64 / Python 3.12 / AVL 3.52 regression runs **299 tests with
 zero failures or skips**, including systematic removal, duplication, empty and

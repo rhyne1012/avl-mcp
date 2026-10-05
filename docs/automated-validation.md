@@ -6,7 +6,7 @@ main pushes, version tags, and manual dispatch. It has two independent layers:
 | Job | What it establishes |
 |---|---|
 | Python 3.11 / 3.12 on Ubuntu 24.04 | Ruff, non-native regression, wheel/sdist build, clean wheel install and dependency check |
-| AVL 3.52 on macOS 15 arm64 / Python 3.12 | Verified upstream source, fresh native build, full regression with no skips, installed-wheel ten-tool stdio and a 256-case disconnect/cancel/resume job |
+| AVL 3.52 on macOS 15 arm64 / Python 3.12 | Verified upstream source, fresh native build, full regression with no skips, installed-wheel eleven-tool stdio including trim and a 256-case disconnect/cancel/resume job |
 | Release acceptance | Both preceding layers succeeded; skipped, cancelled or failed layers cannot pass |
 
 The Python-only job intentionally deselects native tests and is not native
@@ -54,7 +54,12 @@ python -m venv /absolute/local/path/to/acceptance-env
 ```
 
 The stdio test checks the installed console version, real official coefficients,
-all ten tools, a detached job across server disconnection, acknowledged
-cancellation, resume and saved-result queries. Tests establish software and
+all eleven tools, longitudinal trim with independent verification, rejection of
+an out-of-bounds trim solution, saved trim queries, a detached job across server
+disconnection, acknowledged cancellation, resume and saved-result queries.
+The native regression also exercises trim control gains, fixed controls, reference
+points and failure paths. Consult the exact commit's JUnit report and checks for
+executed cases; earlier version reports are historical evidence.
+Tests establish software and
 numerical consistency on the tested platform, not aircraft accuracy, mesh
 independence or an existing desktop client's registry refresh.

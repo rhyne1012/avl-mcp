@@ -4,14 +4,15 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Version: 0.3.0.** Supports AVL **3.52** only. Native execution is
+**Version: 0.4.0 implementation.** Supports AVL **3.52** only. Native execution is
 tested on macOS Apple Silicon; other operating systems are not yet verified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
 [繁體中文說明](README.zh-TW.md) · [Documentation index](docs/README.md) · [Validation](docs/validation.md)
 
-Version 0.3.0 rejects incomplete or inconsistent MRF tables and adds automated
-Python regression plus real AVL acceptance. See [changes](docs/release-0.3.0.md)
+Version 0.4.0 adds single-point longitudinal aerodynamic trim with explicit
+targets, solution acceptance bounds and a separate fixed-condition verification.
+See [changes](docs/release-0.4.0.md), [trim conventions](docs/trim.md)
 and [how to reproduce acceptance](docs/automated-validation.md).
 
 ## Tools
@@ -22,6 +23,7 @@ and [how to reproduce acceptance](docs/automated-validation.md).
 | `avl.inspect` | Read geometry, references, controls and file dependencies |
 | `avl.validate` | Check supported grammar, dependency paths and mesh budget |
 | `avl.run` | Calculate one prescribed condition, loads and ST/SB derivatives |
+| `avl.trim` | Solve alpha and one CONTROL variable for target CL/Cm, then independently verify |
 | `avl.sweep` | Calculate 1-10000 explicit conditions with shared AVL processes and save CSV |
 | `avl.submit` | Snapshot inputs and start a detached background job |
 | `avl.status` | Read progress, counts and the actual job outcome |
@@ -29,7 +31,7 @@ and [how to reproduce acceptance](docs/automated-validation.md).
 | `avl.resume` | Verify saved inputs/results and recompute only missing or failed cases |
 | `avl.results` | Page and filter saved results without running AVL |
 
-The connector does not expose trim, eigenmodes, geometry editing, interactive graphics,
+The connector does not expose eigenmodes, geometry editing, interactive graphics,
 CAD conversion, or automatic OpenVSP comparison. The model validator checks input
 structure and basic invariants; it does not prove freedom from intersections or
 aerodynamic suitability. A successful process exit alone is never accepted as a result.
@@ -151,6 +153,44 @@ Unknown control names are rejected. Omitted controls and angular rates are zero.
 Omitted Mach uses the geometry header. Nearby `.run` and `.mass` files are
 intentionally not loaded in prescribed-condition analyses.
 
+### Longitudinal aerodynamic trim
+
+Call `avl.trim` to solve alpha and one named CONTROL variable at a required Mach:
+
+```json
+{
+  "model_path": "/absolute/path/to/vanilla.avl",
+  "request": {
+    "control": "elevator",
+    "target_cl": 0.6,
+    "target_cm": 0.0,
+    "mach": 0.2,
+    "alpha_bounds_deg": [-10.0, 15.0],
+    "control_bounds": [-30.0, 30.0],
+    "fixed_controls": {"flap": 0.0},
+    "cl_tolerance": 0.000001,
+    "cm_tolerance": 0.000001
+  },
+  "case_name": "vanilla-trim",
+  "timeout_seconds": 120,
+  "outputs": ["total"]
+}
+```
+
+Beta and all angular rates are zero. Other controls are fixed at the requested
+values, defaulting to zero. CONTROL values retain the geometry's gains and signs;
+they are not automatically physical elevator deflections. Cm refers to the model's
+moment reference, or an explicit `references` override, which is not necessarily
+the aircraft CG. No `.mass` or `.run` file is loaded.
+
+AVL's native solver is unconstrained: the required bounds decide whether its
+solution is acceptable and do not clip the result or constrain its iterations.
+A successful result must meet CL/Cm residual tolerances and bounds, then pass
+a fresh fixed-condition run at the solved alpha and control values. The saved
+`trim` metadata separates the request, solved condition, residuals, bounds and
+verification. This is aerodynamic lift/pitch-moment trim, without weight/thrust
+balance. See [the full trim contract and failure behavior](docs/trim.md).
+
 Use `avl.sweep` with `model_path` and a `conditions` array. Its execution budget is
 300 seconds by default (one total budget, not a separate allowance per condition).
 Cases are grouped by Mach to reuse AVL's matrix factorization and returned in the
@@ -164,7 +204,7 @@ sweep returns `isError=true`. Full results are in `result.json`.
 
 ### Select outputs
 
-`avl.run`, `avl.sweep` and `avl.submit` accept `outputs`. Omit it to retain the
+`avl.run`, `avl.trim`, `avl.sweep` and `avl.submit` accept `outputs`. Omit it to retain the
 previous complete output set. Use `["total"]` for forces/moments only, or e.g.
 `["total", "body"]` to add body-axis derivatives. Supported tables are `total`,
 `stability`, `body`, `surfaces`, `strips`. Total output is always retained to verify
@@ -199,7 +239,7 @@ Query coefficients without invoking a solver:
 
 ```json
 {
-  "job_id": "<id returned by submit, run or sweep>",
+  "job_id": "<id returned by submit, run, trim or sweep>",
   "indices": [0, 3, 8],
   "fields": ["total.fields.CLtot", "body.derivatives.Cmq"],
   "offset": 0,
@@ -298,7 +338,8 @@ Native tests are explicitly skipped if `AVL_BIN` is absent. Use
 
 ## Roadmap
 
-- Add trim and eigenmode analysis with appropriate mass/inertia validation.
+- Add batch trim, explicit control mixing and mass/inertia-dependent flight trim
+  or eigenmode analysis after their input and verification contracts are defined.
 - Add controlled geometry generation and previews after the analysis interface stabilizes.
 
 Research aircraft models and CFD data are not part of this repository.

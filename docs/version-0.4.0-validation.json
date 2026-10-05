@@ -1,0 +1,49 @@
+{
+  "package_version": "0.4.0",
+  "date": "2026-10-05",
+  "platform": "macOS arm64",
+  "python": "3.12.14",
+  "native_avl": "3.52",
+  "native_sha256": "88c657e6dfd6a4a7f27410041cf82b1564915dc8020d8326b553922ff0e9b7f3",
+  "tests": {
+    "passed": 365,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "trim_tests": 66,
+    "native_tests": 27
+  },
+  "ruff": "passed",
+  "build_and_pip_check": "passed",
+  "installed_source_files_match": 13,
+  "installed_stdio": {
+    "tools": [
+      "avl.cancel",
+      "avl.health",
+      "avl.inspect",
+      "avl.results",
+      "avl.resume",
+      "avl.run",
+      "avl.status",
+      "avl.submit",
+      "avl.sweep",
+      "avl.trim",
+      "avl.validate"
+    ],
+    "trim_accepted": true,
+    "trim_verification": "passed",
+    "trim_residuals": {
+      "CL": -3.3306690738754696e-16,
+      "Cm": -2.081668171172169e-17
+    },
+    "out_of_bounds_rejected": true,
+    "saved_success_and_failure_queries": true,
+    "worker_survived_disconnect": true,
+    "cancellation_acknowledged": true,
+    "completed_at_cancellation": 21,
+    "background_cases": 256
+  },
+  "research_model_runs": false,
+  "desktop_registration_tested": false,
+  "scope": "Official example geometry only. Software and numerical consistency; not aerodynamic accuracy, physical flight equilibrium or deployed desktop registration."
+}

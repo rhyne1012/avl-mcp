@@ -1,6 +1,6 @@
 # Result contract 1.0.0
 
-Every successful `run`, sweep case and background case saves a `result_contract`
+Every successful `run`, `trim`, sweep case and background case saves a `result_contract`
 object and `result-contract.json`. This is an additive interface: existing native
 coefficient keys, signs and numbers are unchanged. Labels preserve case (`CL` versus
 `Cl`). Metadata describes only tables that were requested and produced.
@@ -53,6 +53,19 @@ small-angle proxy; it is not degrees. `c_cl` is upstream chord-scaled normal loa
 `CNC`, in geometry length units. `C.P.x/c=999` is retained as a native sentinel when
 local cl is zero. Neutral point/spiral sentinels of magnitude at least 1e29 become
 JSON null, as in earlier versions. These diagnostics are not eigenmode results.
+
+## Trim results
+
+For `avl.trim`, the ordinary `condition` is the solved alpha and CONTROL state.
+The native physical result contract remains 1.0.0. A separate `trim` metadata
+object, with its own schema version 1.0.0, records requested targets, residuals,
+acceptance bounds and independent verification. See [the trim contract](trim.md).
+
+Returned ST/SB derivatives are the ordinary native aerodynamic derivatives at
+that solved condition, with the table's stated held-fixed conventions. They are
+not derivatives along a sequence of re-trimmed states: perturbing alpha for a
+native derivative does not simultaneously readjust the elevator to preserve Cm.
+Use separate trim solves when a change along the trim path is required.
 
 ## Separate derived forces
 

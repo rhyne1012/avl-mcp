@@ -59,8 +59,9 @@ has a readelf path but Linux/Windows solver execution remains unverified.
 1. Install the wheel in a machine-local venv and run `python -m pip check`.
 2. Run `--diagnose`, then `--check-mcp` with the intended paths.
 3. Run `scripts/verify_stdio.py` against the exact installed console command and
-   official examples. This validates numerical results, all ten tools, result
-   metadata, saved queries, background cancellation/resumption and reconnection.
+   official examples. This validates numerical results, all eleven tools, trim
+   acceptance and replay, result metadata, saved queries, background
+   cancellation/resumption and reconnection.
 4. Update the client command after backing up its local configuration; preserve
    other settings. Restart/reload the client if needed and check its tools there.
 

@@ -1,4 +1,4 @@
-"""Ten tools over MCP stdio; solver output is always captured to files."""
+"""Eleven tools over MCP stdio; solver output is always captured to files."""
 
 import functools
 import json
@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
 from .jobs import JobManager
-from .models import AVLFailure, FlightCondition, LengthUnit, OutputKind, References
+from .models import AVLFailure, FlightCondition, LengthUnit, OutputKind, References, TrimRequest
 from .runner import AVLRunner
 
 
@@ -19,7 +19,8 @@ def make_server(runner: AVLRunner) -> FastMCP:
         instructions=(
             "AVL 3.52 prescribed-condition aerodynamics. Use avl.validate before runs. "
             "Inputs: geometry X aft/Y right/Z up; rates in standard BODY axes. "
-            "No implicit .run/.mass loading, trim or mode analysis. "
+            "Use avl.trim for single-point longitudinal CL/Cm constraints. "
+            "No implicit .run/.mass loading or mode analysis. "
             "Use avl.submit/status/cancel/resume for durable long-running jobs; "
             "avl.results reads saved results without invoking AVL. "
             "Use returned artifacts for complete results and original solver logs."
@@ -140,6 +141,38 @@ def make_server(runner: AVLRunner) -> FastMCP:
             runner.run,
             model_path,
             condition,
+            references,
+            case_name,
+            timeout_seconds,
+            length_unit,
+            outputs,
+        )
+
+    @server.tool(
+        name="avl.trim",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+        ),
+    )
+    async def trim(
+        model_path: str,
+        request: TrimRequest,
+        references: References | None = None,
+        case_name: str = "trim",
+        timeout_seconds: float = 120,
+        length_unit: LengthUnit = "unspecified",
+        outputs: list[OutputKind] | None = None,
+    ) -> CallToolResult:
+        """Solve alpha and one existing CONTROL for target CL/Cm at zero beta/body rates.
+        CONTROL values retain section gains, not automatically physical deflection degrees.
+        Bounds accept/reject the native solution, not constrain iterations. Success requires
+        residual/bounds checks and a fresh fixed-condition solve. Moments use the explicit
+        geometry/override reference point, not an inferred CG. No mass/thrust balance.
+        """
+        return await invoke(
+            runner.trim,
+            model_path,
+            request,
             references,
             case_name,
             timeout_seconds,

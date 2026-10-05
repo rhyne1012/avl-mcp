@@ -19,6 +19,7 @@ EXPECTED_TOOLS = {
         "inspect",
         "validate",
         "run",
+        "trim",
         "sweep",
         "submit",
         "status",

@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import __version__
 from .geometry import Geometry, inspect_geometry, sha256
-from .models import AVLFailure, FlightCondition, References
+from .models import AVLFailure, FlightCondition, References, TrimRequest
 
 SUPPORTED_AVL = "3.52"
 ERROR_PATTERNS = (
@@ -279,6 +279,22 @@ class AVLRunner:
         changed = [p for p, h in sources.items() if not Path(p).is_file() or sha256(Path(p)) != h]
         if changed:
             raise AVLFailure("SOURCE_CHANGED", "Original input changed.", paths=changed)
+
+    def trim(
+        self,
+        model_path,
+        request: TrimRequest,
+        references=None,
+        case_name="trim",
+        timeout_seconds=120.0,
+        length_unit="unspecified",
+        outputs=None,
+    ):
+        from .trim import run_trim
+
+        return run_trim(
+            self, model_path, request, references, case_name, timeout_seconds, length_unit, outputs
+        )
 
     def sweep(
         self,

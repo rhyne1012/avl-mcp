@@ -4,16 +4,18 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Version: 0.4.0 implementation.** Supports AVL **3.52** only. Native execution is
-tested on macOS Apple Silicon; other operating systems are not yet verified.
+**Version: 0.5.0.dev0 implementation.** Supports AVL **3.52** only. Native acceptance
+covers macOS Apple Silicon and Ubuntu 24.04 x86_64; other platforms are unverified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
 [繁體中文說明](README.zh-TW.md) · [Documentation index](docs/README.md) · [Validation](docs/validation.md)
 
-Version 0.4.0 adds single-point longitudinal aerodynamic trim with explicit
-targets, solution acceptance bounds and a separate fixed-condition verification.
-See [changes](docs/release-0.4.0.md), [trim conventions](docs/trim.md)
-and [how to reproduce acceptance](docs/automated-validation.md).
+Version 0.5 development adds synchronous and durable background trim batches,
+retaining each point's acceptance bounds, residual checks and independent replay.
+It also adds a reproducible Linux native build and acceptance job alongside macOS.
+See [batch trim](docs/batch-trim.md), [Ubuntu installation](docs/native-installation-ubuntu.md),
+[trim conventions](docs/trim.md) and [acceptance](docs/automated-validation.md).
+This development version does not imply a published release or local client upgrade.
 
 ## Tools
 
@@ -24,8 +26,8 @@ and [how to reproduce acceptance](docs/automated-validation.md).
 | `avl.validate` | Check supported grammar, dependency paths and mesh budget |
 | `avl.run` | Calculate one prescribed condition, loads and ST/SB derivatives |
 | `avl.trim` | Solve alpha and one CONTROL variable for target CL/Cm, then independently verify |
-| `avl.sweep` | Calculate 1-10000 explicit conditions with shared AVL processes and save CSV |
-| `avl.submit` | Snapshot inputs and start a detached background job |
+| `avl.sweep` | Calculate 1-10000 prescribed conditions or independently verified trim targets and save CSV |
+| `avl.submit` | Snapshot prescribed conditions or trim targets and start a detached background job |
 | `avl.status` | Read progress, counts and the actual job outcome |
 | `avl.cancel` | Cancel a queued/running job while retaining completed cases |
 | `avl.resume` | Verify saved inputs/results and recompute only missing or failed cases |
@@ -58,6 +60,10 @@ an inherent MCP requirement. See [native installation](docs/native-installation.
 Python release artifacts are a wheel, source distribution and checksums;
 AVL remains a separate installation. The existing optional native bundle is
 retained on the [v0.1.0a1 release](https://github.com/rhyne1012/avl-mcp/releases/tag/v0.1.0a1).
+
+For Ubuntu 24.04 x86_64, use the [Linux build and validation guide](docs/native-installation-ubuntu.md).
+It builds verified upstream source with GNU compilers, X11 and the numerical
+libraries shipped in the AVL archive. Headless analysis does not require an X server.
 
 ### Building AVL on macOS Apple Silicon
 
@@ -191,7 +197,8 @@ a fresh fixed-condition run at the solved alpha and control values. The saved
 verification. This is aerodynamic lift/pitch-moment trim, without weight/thrust
 balance. See [the full trim contract and failure behavior](docs/trim.md).
 
-Use `avl.sweep` with `model_path` and a `conditions` array. Its execution budget is
+Use `avl.sweep` with `model_path` and exactly one of `conditions` or `trim_requests`.
+For prescribed conditions, its execution budget is
 300 seconds by default (one total budget, not a separate allowance per condition).
 Cases are grouped by Mach to reuse AVL's matrix factorization and returned in the
 original request order. Each native process handles at most 128 conditions; the
@@ -201,6 +208,13 @@ then use a fresh process. Timeout/cancellation always stops the attempt.
 The MCP response includes at most 25 case summaries; use `avl.results` to page the rest.
 Completed cases and failed-attempt logs remain available. A partial synchronous
 sweep returns `isError=true`. Full results are in `result.json`.
+
+For trim batches, pass `trim_requests: [<TrimRequest>, ...]` instead of `conditions`.
+Each request has the same required targets, control and bounds as `avl.trim` above.
+Every point runs a fresh native trim followed by independent prescribed-condition
+verification; all points and replays share the total timeout budget. The same
+input works with `avl.submit` for cancellation, verified resume and progress.
+See [batch examples, saved results and failure semantics](docs/batch-trim.md).
 
 ### Select outputs
 
@@ -213,7 +227,7 @@ parsed; querying one later reports `FIELD_NOT_AVAILABLE` rather than rerunning A
 
 ### Durable background jobs
 
-Call `avl.submit` with the same model/conditions/output selection as a sweep.
+Call `avl.submit` with the same model, conditions or trim_requests, and outputs as a sweep.
 It returns a `job_id`; use that ID with `avl.status`, `avl.cancel`, `avl.resume`
 and `avl.results`. Workers run independently of the MCP connection and keep their
 state under `<work-root>/jobs/`. At most two background jobs execute at once per
@@ -338,7 +352,7 @@ Native tests are explicitly skipped if `AVL_BIN` is absent. Use
 
 ## Roadmap
 
-- Add batch trim, explicit control mixing and mass/inertia-dependent flight trim
+- Add explicit control mixing and mass/inertia-dependent flight trim
   or eigenmode analysis after their input and verification contracts are defined.
 - Add controlled geometry generation and previews after the analysis interface stabilizes.
 

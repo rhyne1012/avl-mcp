@@ -2,6 +2,7 @@
 
 import argparse
 import asyncio
+import csv
 import json
 import os
 import subprocess
@@ -11,6 +12,169 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from avl_mcp import __version__
+
+
+def assert_accepted_trim(result, request):
+    """Require evidence from both the native trim and independent replay."""
+    assert result["success"], result
+    assert result["analysis_type"] == "longitudinal_trim", result
+    trim = result["trim"]
+    assert trim["accepted"] and trim["within_bounds"] and trim["native_converged"], trim
+    assert trim["verification"]["status"] == "passed", trim
+    assert result["condition"] == trim["solved_condition"], trim
+    solved = trim["solved_condition"]
+    assert solved["mach"] == request["mach"], trim
+    assert request["alpha_bounds_deg"][0] <= solved["alpha_deg"] <= request["alpha_bounds_deg"][1]
+    control_value = solved["controls"][request["control"]]
+    assert request["control_bounds"][0] <= control_value <= request["control_bounds"][1]
+    for control, value in request["fixed_controls"].items():
+        assert solved["controls"][control] == value, trim
+    for name, tolerance in (("CL", "cl_tolerance"), ("Cm", "cm_tolerance")):
+        assert abs(trim["residuals"][name]) <= request[tolerance], trim
+        assert abs(trim["verification"]["residuals"][name]) <= request[tolerance], trim
+    for name in ("target_cl", "target_cm", "mach", "control"):
+        assert trim["request"][name] == request[name], trim
+
+
+def assert_trim_summary(path, requests, results):
+    """Check the exported CSV against saved per-case evidence, including failures."""
+    with Path(path).open(newline="") as stream:
+        rows = list(csv.DictReader(stream))
+    assert len(rows) == len(requests), rows
+    for index, (row, request, result) in enumerate(zip(rows, requests, results, strict=True)):
+        assert int(row["index"]) == index, row
+        assert row["success"].lower() == str(result["success"]).lower(), row
+        assert float(row["target_cl"]) == request["target_cl"], row
+        assert float(row["target_cm"]) == request["target_cm"], row
+        assert float(row["Mach"]) == request["mach"], row
+        assert row["control"] == request["control"], row
+        trim = result["trim"]
+        assert row["verification_status"] == trim["verification"]["status"], row
+        if result["success"]:
+            solved = trim["solved_condition"]
+            assert float(row["alpha_deg"]) == solved["alpha_deg"], row
+            assert float(row["control_value"]) == solved["controls"][request["control"]], row
+            for name, suffix in (("CL", "cl"), ("Cm", "cm")):
+                assert float(row[f"residual_{suffix}"]) == trim["residuals"][name], row
+                assert (
+                    float(row[f"verified_residual_{suffix}"])
+                    == trim["verification"]["residuals"][name]
+                ), row
+        else:
+            assert row["error_code"] == result["error"]["code"], row
+    return rows
+
+
+async def resume_after_worker_exit(session, job_id):
+    # A terminal status can be observed just before the worker releases its lock.
+    for _ in range(100):
+        resumed = await session.call_tool("avl.resume", {"job_id": job_id})
+        if not resumed.isError:
+            return resumed.structuredContent
+        assert resumed.structuredContent["error"]["code"] == "JOB_BUSY", resumed
+        await asyncio.sleep(0.025)
+    raise AssertionError(f"Worker for {job_id} did not release its lock after cancellation.")
+
+
+async def verify_background_trim(params, err, args, trim_request):
+    requests = [
+        {**trim_request, "target_cl": 0.4 + 0.025 * (i % 12), "mach": 0.1 + 0.05 * (i // 12)}
+        for i in range(24)
+    ]
+    # Initialize the observer before submitting: interpreter startup must not consume
+    # the cancellation window on a fast machine. Only the submitting MCP process exits.
+    async with stdio_client(params, errlog=err) as (reader, writer):
+        async with ClientSession(reader, writer) as observer:
+            await observer.initialize()
+            async with stdio_client(params, errlog=err) as (reader, writer):
+                async with ClientSession(reader, writer) as submitter:
+                    await submitter.initialize()
+                    submitted = await submitter.call_tool(
+                        "avl.submit",
+                        {
+                            "model_path": str(args.vanilla.resolve()),
+                            "trim_requests": requests,
+                            "outputs": ["total"],
+                            "case_name": "stdio-background-trim",
+                            "timeout_seconds": 120,
+                        },
+                    )
+                    assert not submitted.isError, submitted
+                    job_id = submitted.structuredContent["job_id"]
+                    for _ in range(400):
+                        status = await submitter.call_tool("avl.status", {"job_id": job_id})
+                        assert not status.isError, status
+                        state = status.structuredContent
+                        assert state["state"] in ("queued", "running"), state
+                        if state["completed_count"] > 0:
+                            break
+                        await asyncio.sleep(0.01)
+                    assert state["state"] == "running", state
+                    assert 0 < state["completed_count"] < len(requests), state
+                    before_disconnect = state["completed_count"]
+            status = await observer.call_tool("avl.status", {"job_id": job_id})
+            assert not status.isError, status
+            state = status.structuredContent
+            assert state["state"] == "running", state
+            assert before_disconnect <= state["completed_count"] < len(requests), state
+            cancelled = await observer.call_tool("avl.cancel", {"job_id": job_id})
+            assert not cancelled.isError, cancelled
+            for _ in range(400):
+                status = await observer.call_tool("avl.status", {"job_id": job_id})
+                assert not status.isError, status
+                state = status.structuredContent
+                if state["state"] == "cancelled":
+                    break
+                assert state["state"] in ("queued", "running"), state
+                await asyncio.sleep(0.025)
+            assert state["state"] == "cancelled", state
+            assert 0 < state["completed_count"] < len(requests), state
+            cancelled_count = state["completed_count"]
+            checkpoint_dir = Path(state["run_directory"]) / "cases"
+            preserved = {
+                path: (path.read_bytes(), path.stat().st_mtime_ns)
+                for path in checkpoint_dir.glob("*.json")
+                if json.loads(path.read_text())["result"]["success"]
+            }
+            assert len(preserved) == cancelled_count, state
+            await resume_after_worker_exit(observer, job_id)
+            for _ in range(2400):
+                status = await observer.call_tool("avl.status", {"job_id": job_id})
+                assert not status.isError, status
+                state = status.structuredContent
+                if state["state"] == "completed":
+                    break
+                assert state["state"] in ("queued", "running"), state
+                await asyncio.sleep(0.05)
+            assert state["state"] == "completed", state
+            assert state["completed_count"] == len(requests) and state["failed_count"] == 0, state
+            assert state["analysis_type"] == "longitudinal_trim_batch", state
+            for path, (content, modified) in preserved.items():
+                assert path.read_bytes() == content, path
+                assert path.stat().st_mtime_ns == modified, path
+            query = await observer.call_tool(
+                "avl.results", {"job_id": job_id, "limit": len(requests)}
+            )
+            assert not query.isError, query
+            saved = query.structuredContent
+            assert saved["solver_executed"] is False and saved["next_offset"] is None, saved
+            assert saved["matched_count"] == len(requests), saved
+            assert [row["index"] for row in saved["rows"]] == list(range(len(requests))), saved
+            for row, request in zip(saved["rows"], requests, strict=True):
+                assert_accepted_trim(row, request)
+            summary = assert_trim_summary(state["summary_csv"], requests, saved["rows"])
+            return {
+                "job_id": job_id,
+                "requested_count": len(requests),
+                "worker_survived_mcp_disconnect": True,
+                "completed_before_disconnect": before_disconnect,
+                "cancellation_acknowledged": True,
+                "completed_at_cancellation": cancelled_count,
+                "preserved_checkpoint_count": len(preserved),
+                "final_status": state,
+                "query": saved,
+                "summary_csv_rows": summary,
+            }
 
 
 async def verify(args):
@@ -207,6 +371,80 @@ async def verify(args):
                 assert failed_row["success"] is False
                 assert failed_row["error"]["code"] == "TRIM_OUT_OF_BOUNDS"
                 assert failed_row["trim"]["accepted"] is False
+                batch_requests = [
+                    trim_request,
+                    rejected_args["request"],
+                    {**trim_request, "target_cl": 0.7, "mach": 0.15},
+                ]
+                batch_args = {
+                    "model_path": str(args.vanilla.resolve()),
+                    "trim_requests": batch_requests,
+                    "case_name": "mcp-vanilla-trim-batch",
+                    "outputs": ["total"],
+                    "stop_on_error": False,
+                }
+                batch = await session.call_tool("avl.sweep", batch_args)
+                records.append({
+                    "tool": "avl.sweep", "arguments": batch_args,
+                    "response": batch.model_dump(mode="json"),
+                })
+                assert batch.isError, batch
+                batch_result = batch.structuredContent
+                assert batch_result["success"] is False, batch_result
+                assert batch_result["analysis_type"] == "longitudinal_trim_batch", batch_result
+                assert batch_result["requested_count"] == 3, batch_result
+                assert batch_result["attempted_count"] == 3, batch_result
+                assert batch_result["completed_count"] == 2, batch_result
+                assert [row["index"] for row in batch_result["results"]] == [0, 1, 2]
+                for index in (0, 2):
+                    assert_accepted_trim(batch_result["results"][index], batch_requests[index])
+                failed_batch_row = batch_result["results"][1]
+                assert failed_batch_row["success"] is False, failed_batch_row
+                assert failed_batch_row["error"]["code"] == "TRIM_OUT_OF_BOUNDS", failed_batch_row
+                assert failed_batch_row["trim"]["accepted"] is False, failed_batch_row
+                batch_summary = assert_trim_summary(
+                    batch_result["summary_csv"], batch_requests, batch_result["results"]
+                )
+                batch_query = await session.call_tool(
+                    "avl.results",
+                    {
+                        "job_id": batch_result["job_id"],
+                        "indices": [0, 2],
+                        "fields": [
+                            "condition.alpha_deg",
+                            "condition.controls.elevator",
+                            "trim.request.target_cl",
+                            "trim.residuals.CL",
+                            "trim.residuals.Cm",
+                            "trim.accepted",
+                            "trim.verification.status",
+                        ],
+                    },
+                )
+                assert not batch_query.isError, batch_query
+                saved_batch = batch_query.structuredContent
+                assert saved_batch["solver_executed"] is False, saved_batch
+                assert [row["index"] for row in saved_batch["rows"]] == [0, 2], saved_batch
+                for row in saved_batch["rows"]:
+                    index = row["index"]
+                    assert_accepted_trim(row, batch_requests[index])
+                    original = batch_result["results"][index]
+                    for field, actual in row["fields"].items():
+                        expected = original
+                        for part in field.split("."):
+                            expected = expected[part]
+                        assert actual == expected, row
+                for name in ("avl.sweep", "avl.submit"):
+                    for selectors in ({}, {"conditions": [{}], "trim_requests": [trim_request]}):
+                        arguments = {"model_path": str(args.vanilla.resolve()), **selectors}
+                        invalid = await session.call_tool(name, arguments)
+                        records.append({
+                            "tool": name, "arguments": arguments,
+                            "response": invalid.model_dump(mode="json"),
+                        })
+                        assert invalid.isError, invalid
+                        assert invalid.structuredContent["success"] is False, invalid
+                        assert invalid.structuredContent["error"]["code"] == "BATCH_INPUT_REQUIRED"
                 submitted = await session.call_tool(
                     "avl.submit",
                     {
@@ -248,9 +486,7 @@ async def verify(args):
                     await asyncio.sleep(0.025)
                 assert state["state"] == "cancelled", state
                 cancelled_count = state["completed_count"]
-                await asyncio.sleep(0.05)
-                resumed = await session.call_tool("avl.resume", {"job_id": job_id})
-                assert not resumed.isError, resumed
+                await resume_after_worker_exit(session, job_id)
                 for _ in range(1200):
                     state = (
                         await session.call_tool("avl.status", {"job_id": job_id})
@@ -283,6 +519,7 @@ async def verify(args):
                     absent.isError
                     and absent.structuredContent["error"]["code"] == "FIELD_NOT_AVAILABLE"
                 )
+                background_trim = await verify_background_trim(params, err, args, trim_request)
                 report = {
                     "success": True,
                     "package_version": __version__,
@@ -293,6 +530,9 @@ async def verify(args):
                     "calls": records,
                     "trim_saved_query": saved_trim,
                     "rejected_trim_saved_query": saved_rejection,
+                    "trim_batch_saved_query": saved_batch,
+                    "trim_batch_summary_csv_rows": batch_summary,
+                    "background_trim": background_trim,
                     "background_job_id": job_id,
                     "worker_survived_mcp_disconnect": True,
                     "completed_before_disconnect": before_disconnect,
@@ -313,6 +553,9 @@ async def verify(args):
                             "background_cases": 256,
                             "trim_verified": True,
                             "out_of_bounds_trim_rejected": True,
+                            "mixed_trim_batch_verified": True,
+                            "background_trim_cases": background_trim["requested_count"],
+                            "background_trim_checkpoints_preserved": True,
                             "reconnection": True,
                         }
                     )

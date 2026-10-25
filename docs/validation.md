@@ -1,6 +1,34 @@
 # Validation status and history
 
-## Version 0.4.0 implementation
+## Current 0.5 development implementation
+
+Local Ubuntu 24.04 x86_64 / Python 3.12.3 / AVL 3.52 acceptance passed **392 tests
+with zero failures, errors or skips**. The Linux build used GNU Fortran/GCC 13.3.0,
+system X11 and the upstream bundled numerical libraries. The pinned source archive
+was verified and no numerical solver source was changed. Ruff, wheel/sdist build,
+normal wheel installation and dependency checks passed; all 14 installed Python
+source files match the tested implementation.
+
+The installed wheel passed all eleven MCP tools, including mixed successful and
+rejected trim points, selected queries and CSV. Both the existing 256-condition
+job and a 24-point trim job survived the submitting MCP process's disconnection,
+acknowledged cancellation, resumed and completed. Successful trim checkpoints
+retained identical bytes and modification times across resume. Every successful
+trim point retains the single-point residual/bounds checks and independent replay.
+
+See the [local Linux evidence summary](ubuntu-batch-trim-validation.json),
+[batch-trim contract](batch-trim.md) and [Ubuntu reproduction guide](native-installation-ubuntu.md).
+The initial local stdio handshake stalled inside the Codex sandbox; the same
+installed command passed outside that sandbox. No client registry was changed.
+These local results do not certify that constrained sandbox's stdio transport.
+
+CI now requires Python regression plus native builds, full tests and installed-wheel
+acceptance on both Ubuntu and macOS. Consult the exact commit's checks for remote
+outcomes; local Linux evidence is not a macOS run. This development implementation
+does not establish release publication or desktop registration. Existing mesh,
+physical-validity and mass/eigenmode limitations remain applicable.
+
+## Historical version 0.4.0 implementation
 
 Local macOS arm64 / Python 3.12 / AVL 3.52 acceptance passed **365 tests with
 zero failures or skips**, including 66 trim tests and 27 native tests in total.

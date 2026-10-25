@@ -137,8 +137,10 @@ Read saved trim metadata with `avl.results` using the returned `job_id`:
 The query does not rerun AVL. Its outer `success` describes the query; inspect
 the row's `success`, `error` and `trim` to determine whether that analysis passed.
 Failed executed trims remain queryable even when they have no accepted coefficient
-fields. Background `status`, `cancel` and `resume` do not apply to this synchronous
-tool. Submit a new trim request to try different targets or acceptance limits.
+fields. Background `status`, `cancel` and `resume` do not apply to `avl.trim` itself.
+Use `avl.submit` with `trim_requests` for a durable trim batch, or `avl.sweep` with
+the same list for synchronous execution. See [batch trim](batch-trim.md).
+Changed targets or acceptance limits require a new request or job.
 
 ## Failures and validation scope
 
@@ -153,6 +155,7 @@ gain/sign conventions, fixed controls, reference points and negative paths.
 These checks establish software and numerical consistency on the tested build;
 they do not prove physical aircraft trim or flightworthiness.
 
-Batch/background trim, user-defined control mixing, automatic mass-file loading,
-dimensional flight equilibrium and eigenmodes are outside 0.4.0. The native
+Batch/background trim is available in the 0.5 development implementation.
+User-defined control mixing, automatic mass-file loading, dimensional flight
+equilibrium and eigenmodes remain outside the interface. The native
 constraint interface is documented in the [official AVL user guide](https://web.mit.edu/drela/Public/web/avl/avl_doc.txt).

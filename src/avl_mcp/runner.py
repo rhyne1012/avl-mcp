@@ -60,7 +60,7 @@ class AVLRunner:
         directory.mkdir(parents=True, exist_ok=False)
         return directory
 
-    def _process(self, directory: Path, commands: str, timeout: float) -> dict:
+    def _process(self, directory: Path, commands: str, timeout: float, *, cancelled=None) -> dict:
         if not self.executable.is_file() or not os.access(self.executable, os.X_OK):
             raise AVLFailure(
                 "EXECUTABLE_NOT_FOUND", f"AVL executable is unavailable: {self.executable}"
@@ -90,6 +90,9 @@ class AVLRunner:
                 except BrokenPipeError:
                     pass
                 while proc.poll() is None:
+                    if cancelled and cancelled():
+                        failure = AVLFailure("CANCELLED", "Cancellation requested.")
+                        break
                     if time.monotonic() - started > timeout:
                         failure = AVLFailure("TIMEOUT", f"AVL exceeded {timeout:g} seconds.")
                         break
@@ -299,16 +302,31 @@ class AVLRunner:
     def sweep(
         self,
         model_path,
-        conditions,
+        conditions=None,
         references=None,
         case_name="sweep",
         timeout_seconds=300.0,
         length_unit="unspecified",
         stop_on_error=True,
         outputs=None,
+        *,
+        trim_requests=None,
     ):
+        from .batch_trim import batch_mode, sweep_trim
         from .execution import execute_cases, validate_request
 
+        if batch_mode(conditions, trim_requests) == "longitudinal_trim_batch":
+            return sweep_trim(
+                self,
+                model_path,
+                trim_requests,
+                references,
+                case_name,
+                timeout_seconds,
+                length_unit,
+                stop_on_error,
+                outputs,
+            )
         obj = inspect_geometry(model_path, self.input_root)
         selected = validate_request(
             self, obj, conditions, references, outputs, length_unit, timeout_seconds

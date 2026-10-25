@@ -1,0 +1,65 @@
+{
+  "package_version": "0.5.0.dev0",
+  "date": "2026-10-25",
+  "platform": "Ubuntu 24.04 x86_64",
+  "python": "3.12.3",
+  "dependencies": {
+    "mcp": "1.30.0",
+    "pydantic": "2.14.1",
+    "anyio": "4.15.1"
+  },
+  "implementation_sha256": "5a12e80558d16f18769bf49c40237775d16c428958e46f4da9389d0a62a39943",
+  "native_avl": "3.52",
+  "native_sha256": "fc269b9b74f9c835e24df0c1311e22f95ac8e95360ade0e786c9411185b9d5f1",
+  "source_archive_sha256": "0b588ecea9222f5b625d0af0c87ae31daf3cdba1532cf0bbb36f93d6e854849b",
+  "native_build": {
+    "fortran_compiler": "GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "c_compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+    "math_libraries": "upstream bundled LAPACK/BLAS and EISPACK",
+    "numerical_source_modified": false
+  },
+  "tests": {
+    "passed": 392,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "ruff": "passed",
+  "build_and_pip_check": "passed",
+  "installed_source_files_match": 14,
+  "installed_stdio": {
+    "tools": [
+      "avl.cancel",
+      "avl.health",
+      "avl.inspect",
+      "avl.results",
+      "avl.resume",
+      "avl.run",
+      "avl.status",
+      "avl.submit",
+      "avl.sweep",
+      "avl.trim",
+      "avl.validate"
+    ],
+    "single_trim_verified": true,
+    "out_of_bounds_rejected": true,
+    "mixed_trim_batch_results": [
+      true,
+      false,
+      true
+    ],
+    "batch_selector_errors_rejected": true,
+    "saved_queries_and_csv_verified": true,
+    "prescribed_background_cases": 256,
+    "prescribed_completed_at_cancellation": 37,
+    "trim_background_cases": 24,
+    "trim_completed_at_cancellation": 3,
+    "trim_checkpoints_preserved": 3,
+    "trim_worker_survived_disconnect": true,
+    "trim_cancellation_acknowledged": true,
+    "execution_environment": "Local host outside the Codex filesystem/process sandbox; the sandboxed stdio handshake stalled."
+  },
+  "research_model_runs": false,
+  "desktop_registration_tested": false,
+  "scope": "Official examples, local Linux software and numerical consistency only. This file is not macOS acceptance or remote CI evidence; inspect checks for the exact commit."
+}

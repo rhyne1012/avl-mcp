@@ -20,6 +20,7 @@ def make_server(runner: AVLRunner) -> FastMCP:
             "AVL 3.52 prescribed-condition aerodynamics. Use avl.validate before runs. "
             "Inputs: geometry X aft/Y right/Z up; rates in standard BODY axes. "
             "Use avl.trim for single-point longitudinal CL/Cm constraints. "
+            "For batch trim, pass trim_requests instead of conditions to avl.sweep/submit. "
             "No implicit .run/.mass loading or mode analysis. "
             "Use avl.submit/status/cancel/resume for durable long-running jobs; "
             "avl.results reads saved results without invoking AVL. "
@@ -54,6 +55,8 @@ def make_server(runner: AVLRunner) -> FastMCP:
                         "source_preserved",
                         "result_context",
                         "derived",
+                        "analysis_type",
+                        "trim",
                     )
                 }
                 for item in result["results"][:25]
@@ -188,16 +191,20 @@ def make_server(runner: AVLRunner) -> FastMCP:
     )
     async def sweep(
         model_path: str,
-        conditions: list[FlightCondition],
+        conditions: list[FlightCondition] | None = None,
         references: References | None = None,
         case_name: str = "sweep",
         timeout_seconds: float = 300,
         length_unit: LengthUnit = "unspecified",
         stop_on_error: bool = True,
         outputs: list[OutputKind] | None = None,
+        trim_requests: list[TrimRequest] | None = None,
     ) -> CallToolResult:
-        """Run 1-10000 conditions in shared AVL processes, grouped by Mach, within one budget.
-        Return cases in requested order; reset all rates and controls at every condition.
+        """Supply exactly one of conditions or trim_requests, each containing 1-10000 cases.
+        Prescribed conditions share AVL processes grouped by Mach, resetting rates/controls.
+        Trim requests run sequentially: each solves alpha/CONTROL for CL/Cm and independently
+        replays in a fresh process. All cases and replays share one total timeout budget.
+        Return cases in requested order with trim residuals, bounds and verification metadata.
         Select outputs (total is always retained); None preserves all previous tables.
         Preserve successful and failed cases and write summary.csv. For long jobs use submit.
         Return partial results and isError=true if any requested case is unsuccessful.
@@ -212,6 +219,7 @@ def make_server(runner: AVLRunner) -> FastMCP:
             length_unit,
             stop_on_error,
             outputs,
+            trim_requests=trim_requests,
         )
 
     @server.tool(
@@ -222,17 +230,20 @@ def make_server(runner: AVLRunner) -> FastMCP:
     )
     async def submit(
         model_path: str,
-        conditions: list[FlightCondition],
+        conditions: list[FlightCondition] | None = None,
         references: References | None = None,
         case_name: str = "job",
         timeout_seconds: float = 1800,
         length_unit: LengthUnit = "unspecified",
         stop_on_error: bool = True,
         outputs: list[OutputKind] | None = None,
+        trim_requests: list[TrimRequest] | None = None,
     ) -> CallToolResult:
         """Snapshot inputs and start a detached local AVL job; return job_id immediately.
         1-10000 cases, at most two background workers execute per work root. Workers survive
         MCP client disconnection. Timeout is the execution budget per attempt, excluding queue.
+        Supply exactly one of conditions or trim_requests. Every trim requires its own fresh
+        verification; cancel interrupts candidate/replay and resume reuses verified cases only.
         outputs=['total'] skips derivatives/surface/strip output; None requests all tables.
         """
         return await invoke(
@@ -245,6 +256,7 @@ def make_server(runner: AVLRunner) -> FastMCP:
             length_unit,
             stop_on_error,
             outputs,
+            trim_requests=trim_requests,
         )
 
     @server.tool(

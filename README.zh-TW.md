@@ -3,16 +3,17 @@
 透過 MCP 執行 AVL 3.52 氣動分析，提供十四項工具，涵蓋單點分析、縱向配平、網格敏感度、
 重量／速度／CG 換算、批次掃描、背景工作、取消／續跑、結果查詢及安裝診斷。
 
-目前開發版本為 `0.5.0.dev1`，原生驗收涵蓋 macOS Apple Silicon 與 Ubuntu 24.04 x86_64。
+目前版本為 `0.5.0`，原生驗收涵蓋 macOS Apple Silicon 與 Ubuntu 24.04 x86_64。
 安裝與完整工具說明見 [英文 README](README.md)，驗證範圍見
 [驗證紀錄](docs/validation.md)。文件入口見[文件索引](docs/README.md)。
 
-0.5 開發版讓 `avl.sweep` 與 `avl.submit` 接受 `trim_requests`，逐點求攻角與
+0.5.0 讓 `avl.sweep` 與 `avl.submit` 接受 `trim_requests`，逐點求攻角與
 指定 CONTROL，保留殘差、範圍檢查及獨立重算。背景批次可取消與核對後續跑。
 同時加入 Linux 建置與真正 AVL 的驗收流程；原有固定條件呼叫保持相容。
 新版再加入通用網格敏感度與明確單位的重量配平。詳見[批次配平](docs/batch-trim.md)、
 [Ubuntu 安裝](docs/native-installation-ubuntu.md)
-與[自動驗證流程](docs/automated-validation.md)。開發版本不表示已發版或替換本機 MCP。
+與[自動驗證流程](docs/automated-validation.md)。發行檔案與升級範圍見
+[0.5.0 發行說明](docs/release-0.5.0.md)；發布版本不會自動替換本機 MCP 或客戶端設定。
 
 ## 工作方式
 

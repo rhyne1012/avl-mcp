@@ -4,21 +4,22 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Version: 0.5.0.dev1 implementation.** Supports AVL **3.52** only. Native acceptance
+**Version: 0.5.0.** Supports AVL **3.52** only. Native acceptance
 covers macOS Apple Silicon and Ubuntu 24.04 x86_64; other platforms are unverified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
 [繁體中文說明](README.zh-TW.md) · [Documentation index](docs/README.md) · [Validation](docs/validation.md)
 
-Version 0.5 development adds synchronous and durable background trim batches,
+Version 0.5.0 adds synchronous and durable background trim batches,
 retaining each point's acceptance bounds, residual checks and independent replay.
 It also adds a reproducible Linux native build and acceptance job alongside macOS.
-This development snapshot adds general [mesh sensitivity](docs/mesh-sensitivity.md)
+It also adds general [mesh sensitivity](docs/mesh-sensitivity.md)
 and [mass/weight, speed and CG trim inputs](docs/physical-trim.md), with explicit
 unit conversion and saved provenance.
 See [batch trim](docs/batch-trim.md), [Ubuntu installation](docs/native-installation-ubuntu.md),
 [trim conventions](docs/trim.md) and [acceptance](docs/automated-validation.md).
-This development version does not imply a published release or local client upgrade.
+See the [0.5.0 release notes](docs/release-0.5.0.md) for artifacts and upgrade scope.
+Installing a release does not update an existing client's configuration automatically.
 
 ## Tools
 

@@ -1,6 +1,15 @@
 # Validation status and history
 
-## Current 0.5.0.dev1 implementation
+## Current 0.5.0 release
+
+The final version promotes the numerical implementation from 0.5.0.dev1 unchanged.
+Final-version tests, installed-wheel checks, implementation hash and CI references
+are recorded in the validation asset attached to the
+[0.5.0 release](https://github.com/rhyne1012/avl-mcp/releases/tag/v0.5.0).
+The exact release commit/tag must pass the aggregate `Release acceptance` gate.
+See [release notes](release-0.5.0.md) for package contents and upgrade scope.
+
+## Previous 0.5.0.dev1 implementation
 
 Local Ubuntu acceptance passed **487 tests with zero failures, errors or skips**.
 The installed wheel passed all fourteen MCP tools and both existing background

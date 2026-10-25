@@ -1,8 +1,9 @@
 # Documentation index
 
-## Current 0.5 development implementation
+## Current 0.5.0
 
 - [Installation and tool examples](../README.md) and [繁體中文說明](../README.zh-TW.md).
+- [0.5.0 release notes](release-0.5.0.md): package contents, acceptance and upgrade scope.
 - [Batch trim](batch-trim.md): synchronous and durable trim targets with per-point replay.
 - [Mesh sensitivity](mesh-sensitivity.md): general surface refinement with coefficient differences and reports.
 - [Dimensional trim](physical-trim.md): explicit mass/weight, speed and CG conversion, with verified execution.

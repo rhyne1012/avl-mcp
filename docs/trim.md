@@ -74,7 +74,8 @@ affect only the staged copy. `length_unit` labels dimensions without converting
 geometry. Adjacent `.mass` and `.run` files are not loaded.
 
 The requested CL is a coefficient, not a weight or dimensional lift requirement.
-Computing a suitable CL from mass, density, speed and area is outside this tool.
+Use [avl.prepare_trim or avl.trim_physical](physical-trim.md) to convert explicit
+mass/weight, density, speed and area to CL and set an explicit CG reference.
 The solution does not impose thrust/drag or weight balance, symmetric forces,
 lateral trim, static stability or dynamic-mode requirements.
 

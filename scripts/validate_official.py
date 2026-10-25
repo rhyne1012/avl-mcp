@@ -3,9 +3,9 @@
 import argparse
 import json
 import math
-import shutil
 from pathlib import Path
 
+from avl_mcp.mesh import MeshSensitivityRequest
 from avl_mcp.models import FlightCondition
 from avl_mcp.runner import AVLRunner
 
@@ -95,37 +95,19 @@ def main():
             ],
         }
 
-    # This transformation is deliberately limited to the shipped Plane Vanilla
-    # example, whose three SURFACE records specify both panel counts explicitly.
+    # Exercise the same general refinement path exposed to user models over MCP.
+    mesh_study = runner.mesh_sensitivity(
+        str(vanilla),
+        MeshSensitivityRequest(condition=FlightCondition(alpha_deg=3, mach=0.2)),
+        case_name="validation-mesh",
+    )
+    assert mesh_study["success"], mesh_study
     meshes = []
-    for factor in (1, 2, 3):
-        if factor == 1:
-            result = base
-        else:
-            folder = root / "cases" / "derived" / f"vanilla-grid-{factor}"
-            folder.mkdir(parents=True, exist_ok=True)
-            lines = vanilla.read_text().splitlines()
-            meaningful = [
-                i
-                for i, line in enumerate(lines)
-                if line.strip() and not line.lstrip().startswith(("#", "!"))
-            ]
-            for j, i in enumerate(meaningful):
-                if lines[i].strip().upper().startswith("SURFACE"):
-                    index = meaningful[j + 2]
-                    values = lines[index].split()
-                    values[0], values[2] = (
-                        str(int(values[0]) * factor),
-                        str(int(values[2]) * factor),
-                    )
-                    lines[index] = " ".join(values)
-            model = folder / "vanilla.avl"
-            model.write_text("\n".join(lines) + "\n")
-            shutil.copy2(vanilla.parent / "sd7037.dat", folder / "sd7037.dat")
-            result = run(model)
+    for level in mesh_study["levels"]:
+        result = json.loads(Path(level["artifacts"]["result.json"]).read_text())
         meshes.append(
             {
-                "panel_multiplier_each_direction": factor,
+                "panel_multiplier_each_direction": level["factor"],
                 "vortices": result["total"]["counts"]["vortices"],
                 "run_directory": result["run_directory"],
                 **{k: result["total"]["fields"][k] for k in ("CLtot", "Cmtot", "CDind", "CDff")},
@@ -144,6 +126,7 @@ def main():
         "derivatives": derivatives,
         "official_sweeps": sweeps,
         "mesh_sensitivity": meshes,
+        "mesh_sensitivity_report": mesh_study["result_json"],
         "scope": "Official examples; internal derivative consistency and limited mesh sensitivity. "
         "Not experimental, CFD, VSPAERO, or general mesh-independence validation.",
     }

@@ -1,0 +1,91 @@
+{
+  "package_version": "0.5.0.dev1",
+  "installed_source_files_match": 16,
+  "implementation_sha256": "01de34b76b30759c61692ad5dc9f87b288cd0d07fede668dbd49a207dd424e39",
+  "date": "2026-10-25",
+  "platform": "Ubuntu 24.04 x86_64",
+  "python": "3.12.3",
+  "dependencies": {
+    "mcp": "1.30.0",
+    "pydantic": "2.14.1",
+    "anyio": "4.15.1"
+  },
+  "native_avl": "3.52",
+  "native_sha256": "fc269b9b74f9c835e24df0c1311e22f95ac8e95360ade0e786c9411185b9d5f1",
+  "source_archive_sha256": "0b588ecea9222f5b625d0af0c87ae31daf3cdba1532cf0bbb36f93d6e854849b",
+  "tests": {
+    "passed": 487,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "ruff": "passed",
+  "build_and_pip_check": "passed",
+  "mesh_sensitivity": {
+    "native_vortices": [
+      294,
+      1176,
+      2646
+    ],
+    "Cmtot": [
+      0.1199155980932578,
+      0.0933350682601777,
+      0.07790372556335341
+    ],
+    "section_count_and_body_scope_tested": true,
+    "clipped_native_grid_rejected": true,
+    "report_formats": [
+      "JSON",
+      "CSV",
+      "Markdown"
+    ],
+    "convergence_certified": false
+  },
+  "physical_trim": {
+    "target_cl": 0.6,
+    "cg_native": {
+      "x": 0.6,
+      "y": 0.0,
+      "z": 0.03
+    },
+    "verification_status": "passed",
+    "geometry_units_tested": [
+      "m",
+      "ft",
+      "in"
+    ],
+    "synthetic_loading_fixture": true,
+    "saved_provenance_verified": true
+  },
+  "official_validation": {
+    "derivative_checks": 8,
+    "max_relative_error": 2.0308155126879933e-08
+  },
+  "installed_stdio": {
+    "tools": [
+      "avl.cancel",
+      "avl.health",
+      "avl.inspect",
+      "avl.mesh_sensitivity",
+      "avl.prepare_trim",
+      "avl.results",
+      "avl.resume",
+      "avl.run",
+      "avl.status",
+      "avl.submit",
+      "avl.sweep",
+      "avl.trim",
+      "avl.trim_physical",
+      "avl.validate"
+    ],
+    "prescribed_background_cases": 256,
+    "prescribed_completed_at_cancellation": 38,
+    "trim_background_cases": 24,
+    "trim_checkpoints_preserved": 4,
+    "trim_worker_survived_disconnect": true,
+    "trim_cancellation_acknowledged": true,
+    "execution_environment": "Local host outside Codex process sandbox, using the installed wheel and official inputs."
+  },
+  "desktop_registration_tested": false,
+  "scope": "Local software and numerical consistency. This is not aircraft accuracy, general convergence, macOS or remote CI evidence. Check the exact commit for remote acceptance."
+}

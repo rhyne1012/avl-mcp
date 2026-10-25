@@ -1,6 +1,29 @@
 # Validation status and history
 
-## Current 0.5 development implementation
+## Current 0.5.0.dev1 implementation
+
+Local Ubuntu acceptance passed **487 tests with zero failures, errors or skips**.
+The installed wheel passed all fourteen MCP tools and both existing background
+disconnect/cancel/resume scenarios (256 prescribed conditions and 24 trim points).
+All 16 installed Python source files match the tested implementation. Ruff,
+wheel/sdist build and dependency checks passed. The official validation script
+also passed eight derivative checks and the three-level mesh study. See the
+[machine-readable local evidence](mesh-physical-validation.json).
+
+This snapshot adds general mesh sensitivity reports and explicit SI mass/weight,
+speed and CG preparation/execution. Native mesh tests cover surface and section
+counts, dependencies, references, body-discretization scope and actual vortex
+counts. Dimensional trim tests cover metre/foot/inch conversions, input changes,
+failed attempts and independent replay. Installed-wheel acceptance exercises all
+fourteen tools, including the original prescribed/trim background jobs.
+
+See [mesh sensitivity](mesh-sensitivity.md), [dimensional trim](physical-trim.md)
+and [automated acceptance](automated-validation.md). Numerical agreement verifies
+the wrapper's calculations and evidence handling; it does not establish aircraft
+accuracy, mesh independence, mass/inertia dynamics or desktop registration.
+The exact commit's checks record remote acceptance.
+
+## Previous 0.5.0.dev0 Linux and batch-trim implementation
 
 Local Ubuntu 24.04 x86_64 / Python 3.12.3 / AVL 3.52 acceptance passed **392 tests
 with zero failures, errors or skips**. The Linux build used GNU Fortran/GCC 13.3.0,

@@ -51,15 +51,15 @@ has a 45-second protocol budget. It never assumes a desktop app was refreshed.
 
 Missing inspection utilities mean unavailable evidence, not confirmed compatibility.
 Native startup does not prove graphical rendering, all optional library features,
-or numerical results. macOS arm64 is the tested native platform; Linux inspection
-has a readelf path but Linux/Windows solver execution remains unverified.
+or numerical results. Native acceptance covers macOS arm64 and Ubuntu 24.04 x86_64;
+Windows solver execution remains unverified.
 
 ## Validation sequence
 
 1. Install the wheel in a machine-local venv and run `python -m pip check`.
 2. Run `--diagnose`, then `--check-mcp` with the intended paths.
 3. Run `scripts/verify_stdio.py` against the exact installed console command and
-   official examples. This validates numerical results, all eleven tools, trim
+   official examples. This validates numerical results, all fourteen tools, trim
    acceptance and replay, result metadata, saved queries, background
    cancellation/resumption and reconnection.
 4. Update the client command after backing up its local configuration; preserve

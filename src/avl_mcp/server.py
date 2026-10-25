@@ -1,4 +1,4 @@
-"""Eleven tools over MCP stdio; solver output is always captured to files."""
+"""Fourteen tools over MCP stdio; solver output is always captured to files."""
 
 import functools
 import json
@@ -8,7 +8,9 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import CallToolResult, TextContent, ToolAnnotations
 
 from .jobs import JobManager
+from .mesh import MeshSensitivityRequest
 from .models import AVLFailure, FlightCondition, LengthUnit, OutputKind, References, TrimRequest
+from .physical_trim import PhysicalTrimRequest
 from .runner import AVLRunner
 
 
@@ -20,6 +22,8 @@ def make_server(runner: AVLRunner) -> FastMCP:
             "AVL 3.52 prescribed-condition aerodynamics. Use avl.validate before runs. "
             "Inputs: geometry X aft/Y right/Z up; rates in standard BODY axes. "
             "Use avl.trim for single-point longitudinal CL/Cm constraints. "
+            "Use avl.prepare_trim or avl.trim_physical for explicit SI weight/speed and CG inputs. "
+            "Use avl.mesh_sensitivity to compare prescribed conditions across mesh refinements. "
             "For batch trim, pass trim_requests instead of conditions to avl.sweep/submit. "
             "No implicit .run/.mass loading or mode analysis. "
             "Use avl.submit/status/cancel/resume for durable long-running jobs; "
@@ -181,6 +185,76 @@ def make_server(runner: AVLRunner) -> FastMCP:
             timeout_seconds,
             length_unit,
             outputs,
+        )
+
+    @server.tool(
+        name="avl.mesh_sensitivity",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+        ),
+    )
+    async def mesh_sensitivity(
+        model_path: str,
+        request: MeshSensitivityRequest,
+        references: References | None = None,
+        case_name: str = "mesh-sensitivity",
+        timeout_seconds: float = 300,
+        length_unit: LengthUnit = "unspecified",
+    ) -> CallToolResult:
+        """Compare a fixed flight condition across 2-8 increasing mesh factors starting at 1.
+        Refine surface chord/span counts on staged copies; body discretization stays fixed.
+        Preflight every mesh against the configured vortex budget. Save coefficients,
+        baseline/adjacent differences, JSON, CSV and Markdown with one total timeout.
+        Optional absolute tolerances only assess the final adjacent difference; no automatic
+        mesh-convergence claim, Richardson extrapolation, or geometry suitability proof.
+        """
+        return await invoke(
+            runner.mesh_sensitivity, model_path, request, references, case_name,
+            timeout_seconds, length_unit,
+        )
+
+    @server.tool(
+        name="avl.prepare_trim",
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False
+        ),
+    )
+    async def prepare_trim(
+        model_path: str,
+        request: PhysicalTrimRequest,
+        references: References | None = None,
+    ) -> CallToolResult:
+        """Convert explicit SI mass/weight, density and speed to target CL without running AVL.
+        Require geometry length units and a CG with units; set the moment reference to CG.
+        Return a TrimRequest and References usable in trim/sweep/submit, plus provenance.
+        Assumes unbanked steady level lift=weight, zero beta/rates and target Cm=0.
+        Mach is supplied separately; no inferred atmosphere, thrust balance or inertia model.
+        """
+        return await invoke(runner.prepare_trim, model_path, request, references)
+
+    @server.tool(
+        name="avl.trim_physical",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False
+        ),
+    )
+    async def trim_physical(
+        model_path: str,
+        request: PhysicalTrimRequest,
+        references: References | None = None,
+        case_name: str = "physical-trim",
+        timeout_seconds: float = 120,
+        outputs: list[OutputKind] | None = None,
+    ) -> CallToolResult:
+        """Prepare lift=weight and zero pitching moment about explicit CG, then verify trim.
+        Takes SI mass/weight, density and speed plus declared geometry/CG length units.
+        Solves alpha and one CONTROL with bounds/residual checks and independent replay.
+        Save dimensional inputs and conversion provenance with native results, including
+        numerical failures. Mach remains explicit. No thrust balance, mass file or eigenmodes.
+        """
+        return await invoke(
+            runner.trim_physical, model_path, request, references, case_name,
+            timeout_seconds, outputs,
         )
 
     @server.tool(

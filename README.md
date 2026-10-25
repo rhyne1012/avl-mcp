@@ -4,7 +4,7 @@ Run reproducible [AVL](https://web.mit.edu/drela/Public/web/avl/) aerodynamic an
 through the Model Context Protocol. The server validates input, runs AVL in an
 isolated directory, and returns structured results with the original solver files.
 
-**Version: 0.5.0.dev0 implementation.** Supports AVL **3.52** only. Native acceptance
+**Version: 0.5.0.dev1 implementation.** Supports AVL **3.52** only. Native acceptance
 covers macOS Apple Silicon and Ubuntu 24.04 x86_64; other platforms are unverified.
 This project is an independent wrapper, not an official MIT or AVL release.
 
@@ -13,6 +13,9 @@ This project is an independent wrapper, not an official MIT or AVL release.
 Version 0.5 development adds synchronous and durable background trim batches,
 retaining each point's acceptance bounds, residual checks and independent replay.
 It also adds a reproducible Linux native build and acceptance job alongside macOS.
+This development snapshot adds general [mesh sensitivity](docs/mesh-sensitivity.md)
+and [mass/weight, speed and CG trim inputs](docs/physical-trim.md), with explicit
+unit conversion and saved provenance.
 See [batch trim](docs/batch-trim.md), [Ubuntu installation](docs/native-installation-ubuntu.md),
 [trim conventions](docs/trim.md) and [acceptance](docs/automated-validation.md).
 This development version does not imply a published release or local client upgrade.
@@ -26,6 +29,9 @@ This development version does not imply a published release or local client upgr
 | `avl.validate` | Check supported grammar, dependency paths and mesh budget |
 | `avl.run` | Calculate one prescribed condition, loads and ST/SB derivatives |
 | `avl.trim` | Solve alpha and one CONTROL variable for target CL/Cm, then independently verify |
+| `avl.mesh_sensitivity` | Compare coefficients across refined surface meshes and save JSON/CSV/Markdown |
+| `avl.prepare_trim` | Convert explicit mass/weight, airspeed and CG to CL targets and references without running AVL |
+| `avl.trim_physical` | Run independently verified trim from dimensional inputs and retain conversion provenance |
 | `avl.sweep` | Calculate 1-10000 prescribed conditions or independently verified trim targets and save CSV |
 | `avl.submit` | Snapshot prescribed conditions or trim targets and start a detached background job |
 | `avl.status` | Read progress, counts and the actual job outcome |
@@ -33,7 +39,7 @@ This development version does not imply a published release or local client upgr
 | `avl.resume` | Verify saved inputs/results and recompute only missing or failed cases |
 | `avl.results` | Page and filter saved results without running AVL |
 
-The connector does not expose eigenmodes, geometry editing, interactive graphics,
+The connector does not expose eigenmodes, general geometry editing, interactive graphics,
 CAD conversion, or automatic OpenVSP comparison. The model validator checks input
 structure and basic invariants; it does not prove freedom from intersections or
 aerodynamic suitability. A successful process exit alone is never accepted as a result.
@@ -218,7 +224,8 @@ See [batch examples, saved results and failure semantics](docs/batch-trim.md).
 
 ### Select outputs
 
-`avl.run`, `avl.trim`, `avl.sweep` and `avl.submit` accept `outputs`. Omit it to retain the
+`avl.run`, `avl.trim`, `avl.trim_physical`, `avl.sweep` and `avl.submit` accept `outputs`.
+Omit it to retain the
 previous complete output set. Use `["total"]` for forces/moments only, or e.g.
 `["total", "body"]` to add body-axis derivatives. Supported tables are `total`,
 `stability`, `body`, `surfaces`, `strips`. Total output is always retained to verify

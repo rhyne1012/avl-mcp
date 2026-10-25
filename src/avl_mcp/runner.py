@@ -299,6 +299,41 @@ class AVLRunner:
             self, model_path, request, references, case_name, timeout_seconds, length_unit, outputs
         )
 
+    def mesh_sensitivity(
+        self,
+        model_path,
+        request,
+        references=None,
+        case_name="mesh-sensitivity",
+        timeout_seconds=300.0,
+        length_unit="unspecified",
+    ):
+        from .mesh import run_mesh_sensitivity
+
+        return run_mesh_sensitivity(
+            self, model_path, request, references, case_name, timeout_seconds, length_unit
+        )
+
+    def prepare_trim(self, model_path, request, references=None):
+        from .physical_trim import prepare_trim
+
+        return prepare_trim(self, model_path, request, references)
+
+    def trim_physical(
+        self,
+        model_path,
+        request,
+        references=None,
+        case_name="physical-trim",
+        timeout_seconds=120.0,
+        outputs=None,
+    ):
+        from .physical_trim import run_physical_trim
+
+        return run_physical_trim(
+            self, model_path, request, references, case_name, timeout_seconds, outputs
+        )
+
     def sweep(
         self,
         model_path,

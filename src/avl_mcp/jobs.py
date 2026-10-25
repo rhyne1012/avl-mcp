@@ -16,7 +16,7 @@ from pathlib import Path
 from . import __version__
 from .execution import execute_cases, validate_request
 from .geometry import inspect_geometry, sha256
-from .models import AVLFailure, FlightCondition
+from .models import AVLFailure, FlightCondition, References, TrimRequest
 from .runner import AVLRunner
 
 TERMINAL = {"completed", "failed", "cancelled", "interrupted"}
@@ -108,17 +108,24 @@ class JobManager:
     def submit(
         self,
         model_path,
-        conditions,
+        conditions=None,
         references=None,
         case_name="job",
         timeout_seconds=1800,
         length_unit="unspecified",
         stop_on_error=True,
         outputs=None,
+        *,
+        trim_requests=None,
     ):
+        from .batch_trim import batch_mode, validate_trim_requests
+
+        analysis_type = batch_mode(conditions, trim_requests)
+        requests = trim_requests if trim_requests is not None else conditions
         obj = inspect_geometry(model_path, self.runner.input_root)
-        selected = validate_request(
-            self.runner, obj, conditions, references, outputs, length_unit, timeout_seconds
+        validate = validate_trim_requests if trim_requests is not None else validate_request
+        selected = validate(
+            self.runner, obj, requests, references, outputs, length_unit, timeout_seconds
         )
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,47}", case_name):
             raise AVLFailure("INVALID_CASE_NAME", "Use 1-48 ASCII letters, numbers, '_' or '-'.")
@@ -138,10 +145,16 @@ class JobManager:
             "package_version": __version__,
             "implementation_sha256": implementation_hash(),
             "case_name": case_name,
+            "analysis_type": analysis_type,
             "model_path": str(obj.path),
             "sources": staged["sources"],
             "snapshot_hashes": snapshot_hashes,
-            "conditions": [c.model_dump() for c in conditions],
+            "conditions": [c.model_dump() for c in conditions] if conditions is not None else None,
+            "trim_requests": (
+                [r.model_dump(mode="json") for r in trim_requests]
+                if trim_requests is not None
+                else None
+            ),
             "outputs": selected,
             "references_override": references.model_dump() if references else None,
             "length_unit": length_unit,
@@ -161,7 +174,8 @@ class JobManager:
                 job,
                 {
                     "job_id": job.name,
-                    "requested_count": len(conditions),
+                    "analysis_type": analysis_type,
+                    "requested_count": len(requests),
                     "completed_count": 0,
                     "failed_count": 0,
                     "attempt": 0,
@@ -226,6 +240,12 @@ class JobManager:
             "cancel_requested": (job / "cancel.request").exists(),
             "run_directory": str(job),
             "result_json": str(job / "result.json"),
+            **(
+                {"summary_csv": str(job / "summary.csv")}
+                if state.get("analysis_type") == "longitudinal_trim_batch"
+                and (job / "summary.csv").is_file()
+                else {}
+            ),
         }
 
     def cancel(self, job_id):
@@ -264,6 +284,8 @@ class JobManager:
 
     def completed(self, job, spec):
         results = {}
+        trim_requests = spec.get("trim_requests")
+        requests = trim_requests if trim_requests is not None else spec["conditions"]
         for path in sorted((job / "cases").glob("*.json")):
             try:
                 rec = read_json(path)
@@ -275,9 +297,20 @@ class JobManager:
                     or not rec["artifact_hashes"]
                     or rec["fingerprint"] != spec["fingerprint"]
                     or digest(item) != rec["result_sha256"]
-                    or not 0 <= i < len(spec["conditions"])
-                    or item["condition"] != spec["conditions"][i]
+                    or not 0 <= i < len(requests)
                 ):
+                    continue
+                if trim_requests is not None:
+                    trim = item["trim"]
+                    if (
+                        item.get("analysis_type") != "longitudinal_trim"
+                        or trim["request"] != requests[i]
+                        or trim["accepted"] is not True
+                        or trim["verification"]["status"] != "passed"
+                        or trim["solved_condition"] != item["condition"]
+                    ):
+                        continue
+                elif item["condition"] != requests[i]:
                     continue
                 for name, expected in rec["artifact_hashes"].items():
                     artifact = Path(name).resolve()
@@ -304,21 +337,29 @@ class JobManager:
                 raise AVLFailure("JOB_BUSY", "The worker is starting.")
             spec = self.verify_spec(job)
             completed = self.completed(job, spec)
-            if len(completed) == len(spec["conditions"]):
+            requests = (
+                spec["trim_requests"]
+                if spec.get("trim_requests") is not None
+                else spec["conditions"]
+            )
+            if len(completed) == len(requests):
                 state.update(
                     state="completed", completed_count=len(completed), failed_count=0, error=None
                 )
-                atomic_json(
-                    job / "result.json",
-                    {
-                        "success": True,
-                        "requested_count": len(completed),
-                        "attempted_count": len(completed),
-                        "completed_count": len(completed),
-                        "results": [completed[i] for i in sorted(completed)],
-                        "run_directory": str(job),
-                    },
-                )
+                result = {
+                    "success": True,
+                    "requested_count": len(completed),
+                    "attempted_count": len(completed),
+                    "completed_count": len(completed),
+                    "results": [completed[i] for i in sorted(completed)],
+                    "run_directory": str(job),
+                }
+                if spec.get("trim_requests") is not None:
+                    from .batch_trim import write_trim_summary
+
+                    result["analysis_type"] = "longitudinal_trim_batch"
+                    write_trim_summary(job, result)
+                atomic_json(job / "result.json", result)
                 atomic_json(job / "state.json", state)
             else:
                 state.update(completed_count=len(completed), failed_count=0)
@@ -454,7 +495,12 @@ def run_worker(work_root, job_id, token):
             spec = manager.verify_spec(job)
             completed = manager.completed(job, spec)
             obj = inspect_geometry(str(job / "inputs/model.avl"))
-            conditions = [FlightCondition(**c) for c in spec["conditions"]]
+            is_trim = spec.get("trim_requests") is not None
+            requests = (
+                [TrimRequest(**request) for request in spec["trim_requests"]]
+                if is_trim
+                else [FlightCondition(**c) for c in spec["conditions"]]
+            )
             slots = Path(work_root) / "jobs/.slots"
             slots.mkdir(exist_ok=True)
             while True:
@@ -502,12 +548,23 @@ def run_worker(work_root, job_id, token):
                         state["failed_count"] += 1
                     update(current_index=index, error=item.get("error"))
 
-                result = execute_cases(
+                if is_trim:
+                    from .batch_trim import execute_trim_cases
+
+                    execute = execute_trim_cases
+                else:
+                    execute = execute_cases
+                references = (
+                    References(**spec["references_override"])
+                    if spec["references_override"]
+                    else None
+                )
+                result = execute(
                     runner,
                     job,
                     obj,
-                    conditions,
-                    None,
+                    requests,
+                    references,
                     spec["outputs"],
                     spec["length_unit"],
                     spec["timeout_seconds"],

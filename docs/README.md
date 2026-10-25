@@ -1,11 +1,12 @@
 # Documentation index
 
-## Current 0.4.0 implementation
+## Current 0.5 development implementation
 
-- [0.4.0 local acceptance evidence](version-0.4.0-validation.json): 365 tests,
-  eleven installed tools, verified trim and 256 background cases.
 - [Installation and tool examples](../README.md) and [繁體中文說明](../README.zh-TW.md).
-- [0.4.0 changes](release-0.4.0.md): single-point longitudinal aerodynamic trim.
+- [Batch trim](batch-trim.md): synchronous and durable trim targets with per-point replay.
+- [Ubuntu native installation](native-installation-ubuntu.md): verified Linux source build.
+- [Local Ubuntu acceptance evidence](ubuntu-batch-trim-validation.json): 392 tests,
+  eleven installed tools, 256 prescribed conditions and 24 resumable trim points.
 - [Trim inputs and results](trim.md): control/reference semantics, acceptance and independent verification.
 - [Automated acceptance](automated-validation.md): Python tests, real AVL build/tests,
   installed-wheel stdio, and release gate failure rules.
@@ -16,6 +17,8 @@
 
 ## Historical evidence
 
+- [0.4.0 notes](release-0.4.0.md) and [local evidence](version-0.4.0-validation.json):
+  365 tests, eleven installed tools, verified single-point trim and 256 background cases.
 - [0.3.0 notes](release-0.3.0.md) and [local evidence](version-0.3.0-validation.json).
 - [0.2.0 notes](release-0.2.0.md) and [release validation](release-0.2.0-validation.json).
 - [Version promotion](version-0.2.0-validation.json),

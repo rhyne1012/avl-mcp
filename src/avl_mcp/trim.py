@@ -41,25 +41,18 @@ def residuals_accepted(values, request):
     return abs(values["CL"]) <= request.cl_tolerance and abs(values["Cm"]) <= request.cm_tolerance
 
 
-def run_trim(
-    runner, model_path, request, references, case_name, timeout_seconds, length_unit, outputs
-):
-    if not math.isfinite(timeout_seconds) or not 0.1 <= timeout_seconds <= 600:
-        raise AVLFailure("INVALID_TIMEOUT", "Timeout must be between 0.1 and 600 seconds.")
-    obj = inspect_geometry(model_path, runner.input_root)
+def fixed_condition(request):
     if request.control in request.fixed_controls:
         raise AVLFailure(
             "TRIM_CONTROL_CONFLICT", "The trim CONTROL cannot also have a fixed value."
         )
-    fixed = FlightCondition(
+    return FlightCondition(
         mach=request.mach, controls=request.fixed_controls | {request.control: 0}
     )
-    selected = validate_request(
-        runner, obj, [fixed], references, outputs, length_unit, timeout_seconds
-    )
-    job = runner._new_job(case_name)
-    deadline = time.monotonic() + timeout_seconds
-    trim = {
+
+
+def trim_metadata(request):
+    return {
         "schema_version": "1.0.0",
         "request": request.model_dump(mode="json"),
         "solved_condition": None,
@@ -73,6 +66,36 @@ def run_trim(
         "an inferred CG. No weight/thrust balance, stability certification "
         "or unique-root guarantee.",
     }
+
+
+def run_trim(
+    runner,
+    model_path,
+    request,
+    references,
+    case_name,
+    timeout_seconds,
+    length_unit,
+    outputs,
+    *,
+    folder=None,
+    geometry=None,
+    deadline=None,
+    cancelled=None,
+):
+    # Internal batch callers validate their total budget once and share its deadline.
+    if deadline is None and (
+        not math.isfinite(timeout_seconds) or not 0.1 <= timeout_seconds <= 600
+    ):
+        raise AVLFailure("INVALID_TIMEOUT", "Timeout must be between 0.1 and 600 seconds.")
+    obj = geometry or inspect_geometry(model_path, runner.input_root)
+    fixed = fixed_condition(request)
+    selected = validate_request(
+        runner, obj, [fixed], references, outputs, length_unit, timeout_seconds
+    )
+    job = folder if folder is not None else runner._new_job(case_name)
+    deadline = deadline if deadline is not None else time.monotonic() + timeout_seconds
+    trim = trim_metadata(request)
     manifest = {
         "package_version": __version__,
         "analysis_type": "longitudinal_trim",
@@ -90,15 +113,25 @@ def run_trim(
     verify_folder = job / "verification"
 
     def remaining():
+        if cancelled and cancelled():
+            raise AVLFailure("CANCELLED", "Cancellation requested; completed cases are retained.")
         value = deadline - time.monotonic()
         if value <= 0:
             raise AVLFailure("TIMEOUT", "The total trim and verification time budget expired.")
         return value
 
+    def process(directory, commands):
+        budget = remaining()
+        # Keep the historical three-argument call for single-run integrations.
+        if cancelled is None:
+            return runner._process(directory, commands, budget)
+        return runner._process(directory, commands, budget, cancelled=cancelled)
+
     try:
         manifest.update(runner._stage(obj, job, references))
         dump(job / "manifest.json", manifest)
-        process = runner._process(job, trim_commands(obj, request, fixed, selected), remaining())
+        candidate_process = process(job, trim_commands(obj, request, fixed, selected))
+        remaining()
         total = parse_total(job / "total.mrf")
         # Never infer fixed inputs from the candidate output. Release only alpha/control.
         check_total(total, obj, fixed, references, free_alpha=True, free_control=request.control)
@@ -125,7 +158,7 @@ def run_trim(
             )
         condition = FlightCondition(**solved)
         candidate = collect_case(job, obj, condition, references, selected, length_unit)
-        candidate.update(solver=process)
+        candidate.update(solver=candidate_process)
         # Retain the native candidate separately even if verification subsequently fails.
         dump(job / "candidate.json", candidate)
         runner._check_sources(manifest["sources"])
@@ -140,9 +173,8 @@ def run_trim(
             purpose="Independent prescribed-condition replay of native trim",
         )
         dump(verify_folder / "manifest.json", verify_manifest)
-        verification_process = runner._process(
-            verify_folder, runner._commands(obj, condition, selected), remaining()
-        )
+        verification_process = process(verify_folder, runner._commands(obj, condition, selected))
+        remaining()
         verified = collect_case(verify_folder, obj, condition, references, selected, length_unit)
         verified["solver"] = verification_process
         dump(verify_folder / "result.json", verified)

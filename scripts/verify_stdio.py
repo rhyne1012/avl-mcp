@@ -1,8 +1,9 @@
-"""Verify all eleven tools using an installed MCP command and official cases."""
+"""Verify all fourteen tools using an installed MCP command and official cases."""
 
 import argparse
 import asyncio
 import csv
+import hashlib
 import json
 import os
 import subprocess
@@ -12,6 +13,164 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
 from avl_mcp import __version__
+
+
+def source_fingerprints(model_path):
+    """Retain independent hashes for the fixture and its local supporting files."""
+    return {
+        str(path): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(model_path.resolve().parent.rglob("*"))
+        if path.is_file()
+    }
+
+
+async def recorded_call(session, records, name, arguments):
+    result = await session.call_tool(name, arguments)
+    records.append({
+        "tool": name, "arguments": arguments, "response": result.model_dump(mode="json"),
+    })
+    return result
+
+
+async def verify_mesh_sensitivity(session, records, args):
+    before = source_fingerprints(args.vanilla)
+    arguments = {
+        "model_path": str(args.vanilla.resolve()),
+        "request": {
+            "condition": {"alpha_deg": 3, "mach": 0.2},
+            "factors": [1, 2],
+            "absolute_tolerances": {"CLtot": 0.01, "Cmtot": 0.01},
+        },
+        "case_name": "stdio-vanilla-mesh-sensitivity",
+    }
+    response = await recorded_call(session, records, "avl.mesh_sensitivity", arguments)
+    assert not response.isError, response
+    report = response.structuredContent
+    assert report["success"] and report["analysis_type"] == "mesh_sensitivity", report
+    assert report["requested_count"] == report["completed_count"] == 2, report
+    levels = report["levels"]
+    assert [level["factor"] for level in levels] == [1, 2], levels
+    assert [level["counts"]["vortices"] for level in levels] == [294, 1176], levels
+    assert [level["estimated_vortices"] for level in levels] == [294, 1176], levels
+    assert all(level["success"] and level["status"] == "success" for level in levels), levels
+    baseline, refined = levels
+    assert abs(baseline["coefficients"]["CLtot"] - 0.6754170403902354) < 1e-8, baseline
+    assert refined["adjacent_deltas"] == refined["baseline_deltas"], refined
+    for metric in ("CLtot", "CDtot", "CDff", "Cmtot"):
+        expected = refined["coefficients"][metric] - baseline["coefficients"][metric]
+        delta = refined["baseline_deltas"][metric]
+        assert abs(delta["signed"] - expected) < 1e-12, delta
+        assert abs(delta["absolute"] - abs(expected)) < 1e-12, delta
+    assert refined["baseline_deltas"]["CLtot"]["absolute"] > 0.001, refined
+    assert refined["baseline_deltas"]["Cmtot"]["absolute"] > 0.02, refined
+    tolerance = report["last_adjacent_tolerance_check"]
+    assert tolerance["evaluated"] and tolerance["within_tolerance"] is False, tolerance
+    assert tolerance["metrics"]["CLtot"]["within_tolerance"] is True, tolerance
+    assert tolerance["metrics"]["Cmtot"]["within_tolerance"] is False, tolerance
+    for key in ("summary_csv", "report_markdown", "result_json"):
+        assert Path(report[key]).is_file() and Path(report[key]).stat().st_size > 0, report
+    saved = json.loads(Path(report["result_json"]).read_text())
+    assert saved["levels"] == levels, saved
+    with Path(report["summary_csv"]).open(newline="") as stream:
+        rows = list(csv.DictReader(stream))
+    assert [int(row["factor"]) for row in rows] == [1, 2], rows
+    for row, level in zip(rows, levels, strict=True):
+        assert int(row["actual_vortices"]) == level["counts"]["vortices"], row
+        for metric in ("CLtot", "CDtot", "CDff", "Cmtot"):
+            assert float(row[metric]) == level["coefficients"][metric], row
+            assert (
+                float(row[f"{metric}_baseline_absolute"])
+                == level["baseline_deltas"][metric]["absolute"]
+            ), row
+    assert report["source_preserved"] is True, report
+    assert source_fingerprints(args.vanilla) == before
+    for path, fingerprint in report["sources"].items():
+        assert before[path] == fingerprint, report
+    invalid = await recorded_call(
+        session, records, "avl.mesh_sensitivity",
+        {**arguments, "request": {**arguments["request"], "factors": [1, 1]}},
+    )
+    assert invalid.isError, invalid
+    return {"report": report, "summary_csv_rows": rows, "source_hashes_unchanged": True}
+
+
+async def verify_physical_trim(session, records, args, trim_request):
+    before = source_fingerprints(args.vanilla)
+    # Synthetic dimensional fixture: declaring Vanilla lengths as metres here is
+    # an acceptance-test assumption, not a claim about the official model's mass.
+    weight_n = 0.6 * 0.5 * 1.225 * 30**2 * 9
+    request = {
+        key: value for key, value in trim_request.items() if key not in ("target_cl", "target_cm")
+    }
+    request.update({
+        "mass_kg": weight_n / 9.80665,
+        "density_kg_m3": 1.225,
+        "speed_m_s": 30,
+        "geometry_length_unit": "m",
+        "cg": {"x": 0.6, "y": 0, "z": 0.03, "length_unit": "m"},
+    })
+    arguments = {"model_path": str(args.vanilla.resolve()), "request": request}
+    prepared = await recorded_call(session, records, "avl.prepare_trim", arguments)
+    assert not prepared.isError, prepared
+    preparation = prepared.structuredContent
+    assert preparation["success"], preparation
+    assert preparation["solver_executed"] is False, preparation
+    coefficient_request = preparation["trim_request"]
+    assert abs(coefficient_request["target_cl"] - 0.6) < 1e-12, preparation
+    assert coefficient_request["target_cm"] == 0 and coefficient_request["mach"] == 0.2
+    references = preparation["references"]
+    assert references == {"sref": 9, "cref": 0.9, "bref": 10, "xref": 0.6,
+                          "yref": 0, "zref": 0.03}, references
+    provenance = preparation["physical_trim"]
+    conversion = provenance["conversion"]
+    assert conversion["reference_area_m2"] == 9, conversion
+    assert abs(conversion["dynamic_pressure_pa"] - 551.25) < 1e-12, conversion
+    assert abs(conversion["weight_n"] - weight_n) < 1e-10, conversion
+    assert conversion["cg_native"] == {"x": 0.6, "y": 0, "z": 0.03}, conversion
+    physical = await recorded_call(session, records, "avl.trim_physical", {
+        **arguments, "case_name": "stdio-vanilla-physical-trim", "outputs": ["total"],
+    })
+    assert not physical.isError, physical
+    result = physical.structuredContent
+    assert_accepted_trim(result, coefficient_request)
+    assert result["physical_trim"] == provenance, result
+    run_directory = Path(result["run_directory"])
+    saved = json.loads((run_directory / "result.json").read_text())
+    assert saved["physical_trim"] == provenance, saved
+    assert saved["trim"]["verification"]["status"] == "passed", saved
+    assert json.loads((run_directory / "physical-trim.json").read_text()) == provenance
+    query_fields = [
+        "physical_trim.conversion.target_cl",
+        "physical_trim.conversion.reference_area_m2",
+        "physical_trim.conversion.cg_native.x",
+        "physical_trim.conversion.weight_n",
+        "trim.verification.status",
+        "total.fields.CLtot",
+    ]
+    query = await recorded_call(session, records, "avl.results", {
+        "job_id": result["job_id"], "fields": query_fields,
+    })
+    assert not query.isError, query
+    saved_query = query.structuredContent
+    assert saved_query["solver_executed"] is False and len(saved_query["rows"]) == 1
+    fields = saved_query["rows"][0]["fields"]
+    for field in query_fields:
+        expected = result
+        for part in field.split("."):
+            expected = expected[part]
+        assert fields[field] == expected, fields
+    invalid = await recorded_call(session, records, "avl.prepare_trim", {
+        **arguments, "request": {**request, "weight_n": weight_n},
+    })
+    assert invalid.isError, invalid
+    assert source_fingerprints(args.vanilla) == before
+    return {
+        "preparation": preparation,
+        "result": result,
+        "saved_query": saved_query,
+        "source_hashes_unchanged": True,
+        "fixture_assumption": "Vanilla lengths are declared as metres for this synthetic test.",
+    }
 
 
 def assert_accepted_trim(result, request):
@@ -195,6 +354,9 @@ async def verify(args):
         "avl.validate",
         "avl.run",
         "avl.trim",
+        "avl.mesh_sensitivity",
+        "avl.prepare_trim",
+        "avl.trim_physical",
         "avl.sweep",
         "avl.submit",
         "avl.status",
@@ -312,6 +474,8 @@ async def verify(args):
                             "beta_deg", "pb_2v", "qc_2v", "rb_2v"
                         ))
                         assert trim_result["result_contract"]["schema_version"] == "1.0.0"
+                mesh_sensitivity = await verify_mesh_sensitivity(session, records, args)
+                physical_trim = await verify_physical_trim(session, records, args, trim_request)
                 trim_query = await session.call_tool(
                     "avl.results",
                     {
@@ -528,6 +692,8 @@ async def verify(args):
                     "args": params.args,
                     "tools_discovered": sorted(names),
                     "calls": records,
+                    "mesh_sensitivity": mesh_sensitivity,
+                    "physical_trim": physical_trim,
                     "trim_saved_query": saved_trim,
                     "rejected_trim_saved_query": saved_rejection,
                     "trim_batch_saved_query": saved_batch,
@@ -552,6 +718,9 @@ async def verify(args):
                             "tools": sorted(names),
                             "background_cases": 256,
                             "trim_verified": True,
+                            "mesh_sensitivity_verified": True,
+                            "physical_trim_verified": True,
+                            "invalid_dimensional_inputs_rejected": True,
                             "out_of_bounds_trim_rejected": True,
                             "mixed_trim_batch_verified": True,
                             "background_trim_cases": background_trim["requested_count"],

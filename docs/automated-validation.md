@@ -6,7 +6,7 @@ main pushes, version tags, and manual dispatch. It has two independent layers:
 | Job | What it establishes |
 |---|---|
 | Python 3.11 / 3.12 on Ubuntu 24.04 | Ruff, non-native regression, wheel/sdist build, clean wheel install and dependency check |
-| AVL 3.52 on macOS 15 arm64 / Python 3.12 | Verified upstream source, fresh native build, full regression with no skips, installed-wheel eleven-tool stdio including trim and a 256-case disconnect/cancel/resume job |
+| AVL 3.52 on macOS 15 arm64 / Python 3.12 | Verified upstream source, fresh native build, full regression with no skips, installed-wheel fourteen-tool stdio including mesh sensitivity, dimensional trim and background jobs |
 | AVL 3.52 on Ubuntu 24.04 x86_64 / Python 3.12 | Linux source build and the same full regression and installed-wheel acceptance, including synchronous and background trim batches |
 | Release acceptance | Python regression and both native platforms succeeded; skipped, cancelled or failed jobs cannot pass |
 
@@ -58,14 +58,16 @@ python -m venv /absolute/local/path/to/acceptance-env
 ```
 
 The stdio test checks the installed console version, real official coefficients,
-all eleven tools, longitudinal trim with independent verification, rejection of
+all fourteen tools, longitudinal trim with independent verification, rejection of
 an out-of-bounds trim solution, saved trim queries, a detached job across server
 disconnection, acknowledged cancellation, resume and saved-result queries.
 Trim batches additionally cover mixed successful/rejected synchronous points,
 selected result queries, CSV, detached execution and cancellation/resume that
 preserves completed verified checkpoints. Each trim keeps its independent replay.
 The native regression also exercises trim control gains, fixed controls, reference
-points and failure paths. Consult the exact commit's JUnit report and checks for
+points and failure paths. Mesh acceptance compares real refinement levels, exported
+differences and user thresholds. Dimensional trim verifies conversion, CG/reference
+selection, saved provenance and independent replay. Consult the exact commit's JUnit report and checks for
 executed cases; earlier version reports are historical evidence.
 Tests establish software and
 numerical consistency on the tested platform, not aircraft accuracy, mesh

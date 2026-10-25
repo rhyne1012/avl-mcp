@@ -83,7 +83,7 @@ python3 -m venv "$AVL_BUILD_DIR/installed"
 The required native suite rejects a missing solver and the report gate rejects
 skipped tests. It exercises the official Plane Vanilla and Bubble Dancer models,
 output integrity, batch/job lifecycle, and trim behavior against the actual AVL
-binary. The installed-wheel stdio check exercises all eleven tools, including
+binary. The installed-wheel stdio check exercises all fourteen tools, including
 background jobs and trim. Inspect its JSON report at
 `$AVL_BUILD_DIR/stdio-acceptance/reports/mcp-stdio-validation.json`.
 

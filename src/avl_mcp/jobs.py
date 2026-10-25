@@ -426,6 +426,7 @@ class JobManager:
                     "result_context",
                     "analysis_type",
                     "trim",
+                    "physical_trim",
                 )
                 if k in item
             }

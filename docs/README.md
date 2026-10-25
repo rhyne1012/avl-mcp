@@ -4,8 +4,11 @@
 
 - [Installation and tool examples](../README.md) and [繁體中文說明](../README.zh-TW.md).
 - [Batch trim](batch-trim.md): synchronous and durable trim targets with per-point replay.
+- [Mesh sensitivity](mesh-sensitivity.md): general surface refinement with coefficient differences and reports.
+- [Dimensional trim](physical-trim.md): explicit mass/weight, speed and CG conversion, with verified execution.
+- [Local mesh/dimensional-trim evidence](mesh-physical-validation.json): 487 tests and fourteen installed tools.
 - [Ubuntu native installation](native-installation-ubuntu.md): verified Linux source build.
-- [Local Ubuntu acceptance evidence](ubuntu-batch-trim-validation.json): 392 tests,
+- [Previous Linux/batch-trim evidence](ubuntu-batch-trim-validation.json): 392 tests,
   eleven installed tools, 256 prescribed conditions and 24 resumable trim points.
 - [Trim inputs and results](trim.md): control/reference semantics, acceptance and independent verification.
 - [Automated acceptance](automated-validation.md): Python tests, real AVL build/tests,

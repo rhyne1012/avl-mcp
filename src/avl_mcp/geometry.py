@@ -88,6 +88,10 @@ class Geometry:
     dependencies: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     panel_estimate: int = 0
+    # Parsed count-token positions, kept separate from the public geometry report.
+    # Only active counts are included: section counts are ignored when the surface
+    # specifies its own span count, and the final section's count is always ignored.
+    discretization_lines: dict[int, tuple[int, ...]] = field(default_factory=dict)
 
     def report(self) -> dict:
         return {
@@ -155,6 +159,7 @@ def inspect_geometry(model_path: str, allowed_root: Path | None = None) -> Geome
         pos += 1
     current = None
     section = None
+    section_rows = []
 
     def take():
         nonlocal pos
@@ -173,7 +178,7 @@ def inspect_geometry(model_path: str, allowed_root: Path | None = None) -> Geome
             )
         if key in ("SURF", "BODY"):
             _, name = take()
-            _, dims = take()
+            dims_line, dims = take()
             vals = numbers(dims, 2, key)
             current = {
                 "name": name,
@@ -194,6 +199,7 @@ def inspect_geometry(model_path: str, allowed_root: Path | None = None) -> Geome
                         current["n_span"] = _integer(extra[2], "surface span", 1)
                         current["span_spacing"] = extra[3]
                 obj.surfaces.append(current)
+                obj.discretization_lines[dims_line] = (0, 2) if "n_span" in current else (0,)
             else:
                 obj.bodies.append(current)
             section = None
@@ -203,7 +209,7 @@ def inspect_geometry(model_path: str, allowed_root: Path | None = None) -> Geome
         if key == "SECT":
             if current["type"] != "surface":
                 raise AVLFailure("INVALID_GEOMETRY", "SECTION must belong to a surface.")
-            _, text = take()
+            section_line, text = take()
             v = numbers(text, 5, "SECTION")
             if v[3] <= 0:
                 raise AVLFailure("INVALID_GEOMETRY", "Section chord must be positive.")
@@ -219,6 +225,7 @@ def inspect_geometry(model_path: str, allowed_root: Path | None = None) -> Geome
                         raise
             section["controls"] = []
             current["sections"].append(section)
+            section_rows.append((current, section, section_line))
         elif key in ("AFIL", "BFIL"):
             if key == "AFIL" and section is None:
                 raise AVLFailure("INVALID_GEOMETRY", "AFILE requires a SECTION.")
@@ -326,6 +333,9 @@ def inspect_geometry(model_path: str, allowed_root: Path | None = None) -> Geome
             target[key.lower()] = v
     if not obj.surfaces:
         raise AVLFailure("INVALID_GEOMETRY", "At least one lifting surface is required.")
+    for surf, sec, line in section_rows:
+        if "n_span" not in surf and sec is not surf["sections"][-1] and "n_span" in sec:
+            obj.discretization_lines[line] = (5,)
     for surf in obj.surfaces:
         sections = surf["sections"]
         if len(sections) < 2:
